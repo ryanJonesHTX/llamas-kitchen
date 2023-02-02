@@ -1,19 +1,20 @@
 import Form from '../components/Form'
 
-const NewPet = () => {
-  const petForm = {
+const NewRecipe = () => {
+  const recipeForm = {
     name: '',
-    owner_name: '',
-    species: '',
-    age: 0,
-    poddy_trained: false,
-    diet: [],
-    image_url: '',
-    likes: [],
-    dislikes: [],
+    description: '',
+    ingredients: [],
+    prepTime: 0,
+    cookTime: 0,
+    image: '',
+    icloudinaryId: '',
+    category: '',
+    submittedBy: '',
   }
 
-  return <Form formId="add-pet-form" petForm={petForm} className="my-12"/>
+
+  return <Form formId="add-recipe-form" recipeForm={recipeForm}/>
 }
 
-export default NewPet
+export default NewRecipe

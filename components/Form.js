@@ -2,22 +2,22 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { mutate } from 'swr'
 
-const Form = ({ formId, petForm, forNewPet = true }) => {
+const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
   const router = useRouter()
   const contentType = 'application/json'
   const [errors, setErrors] = useState({})
   const [message, setMessage] = useState('')
 
   const [form, setForm] = useState({
-    name: petForm.name,
-    owner_name: petForm.owner_name,
-    species: petForm.species,
-    age: petForm.age,
-    poddy_trained: petForm.poddy_trained,
-    diet: petForm.diet,
-    image_url: petForm.image_url,
-    likes: petForm.likes,
-    dislikes: petForm.dislikes,
+    name: recipeForm.name,
+    description: recipeForm.description,
+    ingredients: recipeForm.ingredients,
+    prepTime: recipeForm.prepTime,
+    cookTime: recipeForm.cookTime,
+    image: recipeForm.image,
+    icloudinaryId: recipeForm.cloudinaryId,
+    category: recipeForm.category,
+    submittedBy: recipeForm.submittedBy,
   })
 
   /* The PUT method edits an existing entry in the mongodb database. */
@@ -25,7 +25,7 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
     const { id } = router.query
 
     try {
-      const res = await fetch(`/api/pets/${id}`, {
+      const res = await fetch(`/api/recipes/${id}`, {
         method: 'PUT',
         headers: {
           Accept: contentType,
@@ -41,17 +41,17 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
 
       const { data } = await res.json()
 
-      mutate(`/api/pets/${id}`, data, false) // Update the local data without a revalidation
+      mutate(`/api/recipes/${id}`, data, false) // Update the local data without a revalidation
       router.push('/')
     } catch (error) {
-      setMessage('Failed to update pet')
+      setMessage('Failed to update recipe')
     }
   }
 
   /* The POST method adds a new entry in the mongodb database. */
   const postData = async (form) => {
     try {
-      const res = await fetch('/api/pets', {
+      const res = await fetch('/api/recipes', {
         method: 'POST',
         headers: {
           Accept: contentType,
@@ -67,14 +67,13 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
 
       router.push('/')
     } catch (error) {
-      setMessage('Failed to add pet')
+      setMessage('Failed to add recipe')
     }
   }
 
   const handleChange = (e) => {
     const target = e.target
-    const value =
-      target.name === 'poddy_trained' ? target.checked : target.value
+    const value = target.value
     const name = target.name
 
     setForm({
@@ -86,22 +85,29 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
   /* Makes sure pet info is filled for pet name, owner name, species, and image url*/
   const formValidate = () => {
     let err = {}
-    if (!form.name) err.name = 'Name is required'
-    if (!form.owner_name) err.owner_name = 'Owner is required'
-    if (!form.species) err.species = 'Species is required'
-    if (!form.image_url) err.image_url = 'Image URL is required'
-    return err
+    if (!form.name) err.name = 'A recipe has no name?'
+    if (!form.description) err.description = 'Please provide a brief description of the recipe'
+    if (!form.ingredients) err.ingredients = 'There\'s gotta be at least one ingredient! Right?'
+    if (form.prepTime !== Number) err.prepTime = 'Only the number amount please'
+    if (form.cookTime !== Number) err.cookTime = 'Only the number amount please'
+        return err
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     const errs = formValidate()
     if (Object.keys(errs).length === 0) {
-      forNewPet ? postData(form) : putData(form)
+      forNewRecipe ? postData(form) : putData(form)
     } else {
       setErrors({ errs })
     }
   }
+
+  const [counter, setCounter] = useState(0);
+
+  const handleAdd = () => {
+    setCounter(counter + 1);
+  };
 
   return (
     <div className="overflow-hidden bg-white py-16 px-6 lg:px-8 lg:py-24">
@@ -189,80 +195,151 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
           Submit
         </button>
       </form>
-      <p>{message}</p>
-      <div>
-        {Object.keys(errors).map((err, index) => (
-          <li key={index}>{err}</li>
-        ))}
-      </div>
+      
       <div className="relative mx-auto max-w-4xl">
-        <form className="space-y-8 divide-y divide-gray-200">
-        <div className="space-y-8 divide-y divide-gray-200">
-          <div>
+        <form className="space-y-8 divide-y divide-gray-200" id={formId} onSubmit={handleSubmit}>
+          <div className="space-y-8 divide-y divide-gray-200">
             <div>
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Profile</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                This information will be displayed publicly so be careful what you share.
-              </p>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-              <div className="sm:col-span-4">
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                  Username
-                </label>
-                <div className="mt-1 flex rounded-md shadow-sm">
-                  <span className="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 bg-gray-50 px-3 text-gray-500 sm:text-sm">
-                    workcation.com/
-                  </span>
-                  <input
-                    type="text"
-                    name="username"
-                    id="username"
-                    autoComplete="username"
-                    className="block w-full min-w-0 flex-1 rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
+              <div>
+                <h3 className="text-lg font-medium leading-6 text-gray-900">New Recipe</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Please fill out the form to add a new recipe.
+                </p>
               </div>
 
+              <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                <div className="sm:col-span-6">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Recipe Name
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+               </div>
               <div className="sm:col-span-6">
-                <label htmlFor="about" className="block text-sm font-medium text-gray-700">
-                  About
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                  Description
                 </label>
                 <div className="mt-1">
                   <textarea
-                    id="about"
-                    name="about"
+                    id="description"
+                    name="description"
                     rows={3}
                     className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     defaultValue={''}
                   />
                 </div>
-                <p className="mt-2 text-sm text-gray-500">Write a few sentences about yourself.</p>
+                <p className="mt-2 text-sm text-gray-500">Write a brief description of the recipe</p>
+              </div>
+
+              <div className="sm:col-span-6">
+                <label htmlFor="directions" className="block text-sm font-medium text-gray-700">
+                  Directions
+                </label>
+                <div className="mt-1">
+                  <textarea
+                    id="Directions"
+                    name="Directions"
+                    rows={3}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    defaultValue={''}
+                  />
+                </div>
+              </div>
+              
+                <div className="sm:col-span-6">
+                  <label htmlFor="ingredients" className="block text-sm font-medium text-gray-700">
+                    Ingredients
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      name="ingredients"
+                      id="ingredients"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                {Array.from(Array(counter)).map((c, index) => {
+                  return (
+                  <div className="sm:col-span-6">
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      name="ingredients"
+                      id="ingredients"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+                )
+                })}
+                <button
+                onClick={handleAdd}
+                className="rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                Add Ingredient
+                </button>
+
+                <div className="sm:col-start-1 sm:col-span-1">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Prep Time
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      name="name"
+                      id="name"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+               </div>
+                <div className="col-span-1">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Cook Time
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      name="name"
+                      id="name"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+               </div>
+
+               <div className="sm:col-start-1 sm:col-span-2">
+                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                  Category
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="category"
+                    name="category"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option>Select a Category</option>
+                    <option>Chicken</option>
+                    <option>Beef</option>
+                    <option>Pork</option>
+                    <option>Seafood</option>
+                    <option>Pasta</option>
+                    <option>Vegetarian</option>
+                    <option>Dessert</option>
+                    <option>Other</option>
+                  </select>
+                </div>
               </div>
 
               <div className="sm:col-span-6">
                 <label htmlFor="photo" className="block text-sm font-medium text-gray-700">
                   Photo
-                </label>
-                <div className="mt-1 flex items-center">
-                  <span className="h-12 w-12 overflow-hidden rounded-full bg-gray-100">
-                    <svg className="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                  </span>
-                  <button
-                    type="button"
-                    className="ml-5 rounded-md border border-gray-300 bg-white py-2 px-3 text-sm font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  >
-                    Change
-                  </button>
-                </div>
-              </div>
-
-              <div className="sm:col-span-6">
-                <label htmlFor="cover-photo" className="block text-sm font-medium text-gray-700">
-                  Cover photo
                 </label>
                 <div className="mt-1 flex justify-center rounded-md border-2 border-dashed border-gray-300 px-6 pt-5 pb-6">
                   <div className="space-y-1 text-center">
@@ -290,247 +367,10 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
                       </label>
                       <p className="pl-1">or drag and drop</p>
                     </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                    <p className="text-xs text-gray-500">PNG, JPG, JPEG up to 10MB</p>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="pt-8">
-            <div>
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Personal Information</h3>
-              <p className="mt-1 text-sm text-gray-500">Use a permanent address where you can receive mail.</p>
-            </div>
-            <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-              <div className="sm:col-span-3">
-                <label htmlFor="first-name" className="block text-sm font-medium text-gray-700">
-                  First name
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="first-name"
-                    id="first-name"
-                    autoComplete="given-name"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="last-name" className="block text-sm font-medium text-gray-700">
-                  Last name
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="last-name"
-                    id="last-name"
-                    autoComplete="family-name"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-4">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email address
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                  Country
-                </label>
-                <div className="mt-1">
-                  <select
-                    id="country"
-                    name="country"
-                    autoComplete="country-name"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    <option>United States</option>
-                    <option>Canada</option>
-                    <option>Mexico</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="sm:col-span-6">
-                <label htmlFor="street-address" className="block text-sm font-medium text-gray-700">
-                  Street address
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="street-address"
-                    id="street-address"
-                    autoComplete="street-address"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-                  City
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="city"
-                    id="city"
-                    autoComplete="address-level2"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="region" className="block text-sm font-medium text-gray-700">
-                  State / Province
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="region"
-                    id="region"
-                    autoComplete="address-level1"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="postal-code" className="block text-sm font-medium text-gray-700">
-                  ZIP / Postal code
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="postal-code"
-                    id="postal-code"
-                    autoComplete="postal-code"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-8">
-            <div>
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Notifications</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                We'll always let you know about important changes, but you pick what else you want to hear about.
-              </p>
-            </div>
-            <div className="mt-6">
-              <fieldset>
-                <legend className="sr-only">By Email</legend>
-                <div className="text-base font-medium text-gray-900" aria-hidden="true">
-                  By Email
-                </div>
-                <div className="mt-4 space-y-4">
-                  <div className="relative flex items-start">
-                    <div className="flex h-5 items-center">
-                      <input
-                        id="comments"
-                        name="comments"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div className="ml-3 text-sm">
-                      <label htmlFor="comments" className="font-medium text-gray-700">
-                        Comments
-                      </label>
-                      <p className="text-gray-500">Get notified when someones posts a comment on a posting.</p>
-                    </div>
-                  </div>
-                  <div className="relative flex items-start">
-                    <div className="flex h-5 items-center">
-                      <input
-                        id="candidates"
-                        name="candidates"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div className="ml-3 text-sm">
-                      <label htmlFor="candidates" className="font-medium text-gray-700">
-                        Candidates
-                      </label>
-                      <p className="text-gray-500">Get notified when a candidate applies for a job.</p>
-                    </div>
-                  </div>
-                  <div className="relative flex items-start">
-                    <div className="flex h-5 items-center">
-                      <input
-                        id="offers"
-                        name="offers"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div className="ml-3 text-sm">
-                      <label htmlFor="offers" className="font-medium text-gray-700">
-                        Offers
-                      </label>
-                      <p className="text-gray-500">Get notified when a candidate accepts or rejects an offer.</p>
-                    </div>
-                  </div>
-                </div>
-              </fieldset>
-              <fieldset className="mt-6">
-                <legend className="contents text-base font-medium text-gray-900">Push Notifications</legend>
-                <p className="text-sm text-gray-500">These are delivered via SMS to your mobile phone.</p>
-                <div className="mt-4 space-y-4">
-                  <div className="flex items-center">
-                    <input
-                      id="push-everything"
-                      name="push-notifications"
-                      type="radio"
-                      className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label htmlFor="push-everything" className="ml-3 block text-sm font-medium text-gray-700">
-                      Everything
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      id="push-email"
-                      name="push-notifications"
-                      type="radio"
-                      className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label htmlFor="push-email" className="ml-3 block text-sm font-medium text-gray-700">
-                      Same as email
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      id="push-nothing"
-                      name="push-notifications"
-                      type="radio"
-                      className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label htmlFor="push-nothing" className="ml-3 block text-sm font-medium text-gray-700">
-                      No push notifications
-                    </label>
-                  </div>
-                </div>
-              </fieldset>
             </div>
           </div>
         </div>
@@ -538,20 +378,20 @@ const Form = ({ formId, petForm, forNewPet = true }) => {
         <div className="pt-5">
           <div className="flex justify-end">
             <button
-              type="button"
-              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              Cancel
-            </button>
-            <button
               type="submit"
               className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              Save
+              Submit
             </button>
           </div>
         </div>
         </form>
+        <p>{message}</p>
+      <div>
+        {Object.keys(errors).map((err, index) => (
+          <li key={index}>{err}</li>
+        ))}
+      </div>
       </div>
   </div>
   )
