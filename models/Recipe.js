@@ -9,6 +9,10 @@ const RecipeSchema = new mongoose.Schema({
     type: String,
     required: [true, "Please provide a brief description of the recipe"],
   },
+  directions: {
+    type: String,
+    required: [true, "Steps please"],
+  },
   ingredients: {
     type: Array,
     required: [true, 'There\'s gotta be at least one ingredient! Right?'],
@@ -21,7 +25,7 @@ const RecipeSchema = new mongoose.Schema({
     type: Number,
     require: [true, 'Only the number amount please']
   },
-  image: {
+  photo: {
     type: String,
     require: true,
   },

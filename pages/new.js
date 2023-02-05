@@ -8,7 +8,7 @@ const NewRecipe = () => {
     prepTime: 0,
     cookTime: 0,
     image: '',
-    icloudinaryId: '',
+    cloudinaryId: '',
     category: '',
     submittedBy: '',
   }

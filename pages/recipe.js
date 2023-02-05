@@ -1,4 +1,3 @@
-
 const product = {
   name: 'Basic Tee',
   price: '$35',
@@ -10,7 +9,8 @@ const product = {
   images: [
     {
       id: 1,
-      imageSrc: 'https://tailwindui.com/img/ecommerce-images/product-page-01-featured-product-shot.jpg',
+      imageSrc:
+        'https://tailwindui.com/img/ecommerce-images/product-page-01-featured-product-shot.jpg',
       imageAlt: "Back of women's Basic Tee in black.",
       primary: true,
     },
@@ -31,7 +31,8 @@ const relatedProducts = [
     id: 1,
     name: 'Basic Tee',
     href: '#',
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-02.jpg',
+    imageSrc:
+      'https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-02.jpg',
     imageAlt: "Front of men's Basic Tee in white.",
     price: '$35',
     color: 'Aspen White',
@@ -44,15 +45,15 @@ function classNames(...classes) {
 }
 
 export default function Recipepage() {
-
   return (
     <div className="bg-white">
-
       <main className="mx-auto mt-8 max-w-2xl px-4 sm:px-6 pb-20 lg:max-w-7xl lg:px-8">
         <div className="lg:grid lg:grid-cols-12 lg:gap-x-8">
-            <div className="lg:col-span-5 lg:col-start-8">
-              <h1 className="text-xl font-medium text-gray-900">{product.name}</h1>
-            </div>
+          <div className="lg:col-span-5 lg:col-start-8">
+            <h1 className="text-xl font-medium text-gray-900">
+              {product.name}
+            </h1>
+          </div>
           {/* Image gallery */}
           <div className="mt-8 lg:col-span-7 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:mt-0">
             <h2 className="sr-only">Images</h2>
@@ -64,7 +65,9 @@ export default function Recipepage() {
                   src={image.imageSrc}
                   alt={image.imageAlt}
                   className={classNames(
-                    image.primary ? 'lg:col-span-2 lg:row-span-2' : 'hidden lg:block',
+                    image.primary
+                      ? 'lg:col-span-2 lg:row-span-2'
+                      : 'hidden lg:block',
                     'rounded-lg'
                   )}
                 />
@@ -73,7 +76,6 @@ export default function Recipepage() {
           </div>
 
           <div className="mt-8 lg:col-span-5">
-
             {/* Product details */}
             <div className="mt-10">
               <h2 className="text-sm font-medium text-gray-900">Ingredients</h2>
@@ -96,7 +98,6 @@ export default function Recipepage() {
             </div>
           </div>
         </div>
-
 
         {/* Related products */}
         {/* <section aria-labelledby="related-heading" className="mt-16 sm:mt-24">

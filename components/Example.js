@@ -27,7 +27,10 @@ export default function Example() {
           </svg>
 
           <div className="relative px-6 pt-6 lg:pl-8 lg:pr-0">
-            <nav className="flex items-center justify-between sm:h-10 lg:justify-start" aria-label="Global">
+            <nav
+              className="flex items-center justify-between sm:h-10 lg:justify-start"
+              aria-label="Global"
+            >
               <Link href="#" className="-m-1.5 p-1.5">
                 <span className="sr-only">Llama's Kitchen</span>
                 <img
@@ -46,7 +49,11 @@ export default function Example() {
               </button>
               <div className="hidden lg:ml-12 lg:block lg:space-x-14">
                 {navigation.map((item) => (
-                  <Link key={item.name} href={item.href} className="text-sm font-semibold leading-6 text-gray-900">
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className="text-sm font-semibold leading-6 text-gray-900"
+                  >
                     {item.name}
                   </Link>
                 ))}
@@ -58,7 +65,10 @@ export default function Example() {
                   </label>
                   <div className="relative text-gray-400 focus-within:text-gray-600">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
+                      <MagnifyingGlassIcon
+                        className="h-5 w-5"
+                        aria-hidden="true"
+                      />
                     </div>
                     <input
                       id="search"
@@ -101,38 +111,41 @@ export default function Example() {
                       {item.name}
                     </Link>
                   ))}
-                   <div className="flex flex-1 justify-center px-2 lg:ml-6 lg:justify-end">
-                      <div className="w-full max-w-lg lg:max-w-xs">
-                        <label htmlFor="search" className="sr-only">
-                          Search
-                        </label>
-                        <div className="relative text-gray-400 focus-within:text-gray-600">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                            <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
-                          </div>
-                          <input
-                            id="search"
-                            className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
-                            placeholder="Search"
-                            type="search"
-                            name="search"
+                  <div className="flex flex-1 justify-center px-2 lg:ml-6 lg:justify-end">
+                    <div className="w-full max-w-lg lg:max-w-xs">
+                      <label htmlFor="search" className="sr-only">
+                        Search
+                      </label>
+                      <div className="relative text-gray-400 focus-within:text-gray-600">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                          <MagnifyingGlassIcon
+                            className="h-5 w-5"
+                            aria-hidden="true"
                           />
                         </div>
+                        <input
+                          id="search"
+                          className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
+                          placeholder="Search"
+                          type="search"
+                          name="search"
+                        />
                       </div>
                     </div>
+                  </div>
                 </div>
               </Dialog.Panel>
             </Dialog>
-                
           </div>
 
           <div className="relative py-32 px-6 sm:py-40 lg:py-56 lg:px-8 lg:pr-0">
             <div className="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
               <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-                    Llama's Kitchen
+                Llama's Kitchen
               </h1>
               <p className="mt-6 text-lg leading-8 text-gray-600">
-                A collection of recipes acquired from friends, family and discovered as we go along!
+                A collection of recipes acquired from friends, family and
+                discovered as we go along!
               </p>
               <div className="mt-10 flex items-center gap-x-6">
                 <Link
@@ -141,7 +154,10 @@ export default function Example() {
                 >
                   Latest Recipes
                 </Link>
-                <a href="#" className="text-base font-semibold leading-7 text-gray-900">
+                <a
+                  href="#"
+                  className="text-base font-semibold leading-7 text-gray-900"
+                >
                   Random Recipe <span aria-hidden="true">→</span>
                 </a>
               </div>
