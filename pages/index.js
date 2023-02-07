@@ -1,12 +1,12 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
-import Example from '../components/Example'
 import LatestRecipes from '../components/LatestRecipes'
+import Landing from '../components/Landing'
 
 const Index = ( { recipes }) => {
   return (
     <>
-      <Example />
+      <Landing />
       <LatestRecipes 
         recipes={recipes}
       />
@@ -23,7 +23,7 @@ export async function getServerSideProps() {
   const recipes = result.map((doc) => {
     const recipe = doc.toObject()
     recipe._id = recipe._id.toString()
-    return recipe
+    return JSON.parse(JSON.stringify(recipe))
   })
 
   return { props: { recipes: recipes } }

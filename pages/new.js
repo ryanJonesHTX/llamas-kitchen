@@ -11,6 +11,7 @@ const NewRecipe = () => {
     cloudinaryId: '',
     category: '',
     submittedBy: '',
+    notes: '',
   }
 
 

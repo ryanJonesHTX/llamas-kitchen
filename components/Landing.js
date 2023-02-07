@@ -10,7 +10,7 @@ const navigation = [
   { name: 'Add Recipe', href: '/new' },
 ]
 
-export default function Example() {
+export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
@@ -31,10 +31,10 @@ export default function Example() {
               className="flex items-center justify-between sm:h-10 lg:justify-start"
               aria-label="Global"
             >
-              <Link href="#" className="-m-1.5 p-1.5">
+              <Link href="/" className="-m-1.5 p-1.5">
                 <span className="sr-only">Llama's Kitchen</span>
                 <img
-                  alt="Your Company"
+                  alt="Llama's Kitchen"
                   className="h-8 w-auto"
                   src="https://img.freepik.com/free-vector/cute-alpaca-llama-cartoon-animal-nature-icon-concept-isolated-flat-cartoon-style_138676-2181.jpg?w=1800&t=st=1675133471~exp=1675134071~hmac=7dec50e0f322f3ddacebd69d37ccd456787124dcd886101725b6b8b060dbce46"
                 />
@@ -97,7 +97,7 @@ export default function Example() {
                     <img
                       className="h-8"
                       src="https://img.freepik.com/free-vector/cute-alpaca-llama-cartoon-animal-nature-icon-concept-isolated-flat-cartoon-style_138676-2181.jpg?w=1800&t=st=1675133471~exp=1675134071~hmac=7dec50e0f322f3ddacebd69d37ccd456787124dcd886101725b6b8b060dbce46"
-                      alt=""
+                      alt="Llama's Kitchen"
                     />
                   </Link>
                 </div>
@@ -145,21 +145,21 @@ export default function Example() {
               </h1>
               <p className="mt-6 text-lg leading-8 text-gray-600">
                 A collection of recipes acquired from friends, family and
-                discovered as we go along!
+                discovered as we go along! Please feel free to add your personal favorites for us to try.
               </p>
               <div className="mt-10 flex items-center gap-x-6">
                 <Link
                   href="/recipes"
                   className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-base font-semibold leading-7 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 >
-                  Latest Recipes
+                  All Recipes
                 </Link>
-                <a
-                  href="#"
+                <Link
+                  href="/new"
                   className="text-base font-semibold leading-7 text-gray-900"
                 >
-                  Random Recipe <span aria-hidden="true">→</span>
-                </a>
+                  Add Recipe <span aria-hidden="true">→</span>
+                </Link>
               </div>
             </div>
           </div>

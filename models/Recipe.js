@@ -1,46 +1,54 @@
 import mongoose from 'mongoose'
+const { Schema } = mongoose;
 
-const RecipeSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'A recipe has no name?'],
+const RecipeSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    directions: {
+      type: String,
+      required: true,
+    },
+    ingredients: {
+      type: Array,
+      required: true,
+    },
+    prepTime: {
+      type: Number,
+      require: true,
+    },
+    cookTime: {
+      type: Number,
+      require: true,
+    },
+    photo: {
+      type: String,
+      require: true,
+    },
+    cloudinaryId: {
+      type: String,
+      require: true,
+    },
+    category: {
+      type: String,
+      require: true,
+    },
+    submittedBy: {
+      type: String,
+      require: false,
+    },
+    notes: {
+      type: String,
+      require: false,
+    }
   },
-  description: {
-    type: String,
-    required: [true, "Please provide a brief description of the recipe"],
-  },
-  directions: {
-    type: String,
-    required: [true, "Steps please"],
-  },
-  ingredients: {
-    type: Array,
-    required: [true, 'There\'s gotta be at least one ingredient! Right?'],
-  },
-  prepTime: {
-    type: Number,
-    require: [true, 'Only the number amount please']
-  },
-  cookTime: {
-    type: Number,
-    require: [true, 'Only the number amount please']
-  },
-  photo: {
-    type: String,
-    require: true,
-  },
-  cloudinaryId: {
-    type: String,
-    require: true,
-  },
-  category: {
-    type: String,
-    require: true,
-  },
-  submittedBy: {
-    type: String,
-    require: false,
-  },
-})
+  { timestamps: true }
+);
 
 export default mongoose.models.Recipe || mongoose.model('Recipe', RecipeSchema)

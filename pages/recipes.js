@@ -1,4 +1,6 @@
-
+import dbConnect from '../lib/dbConnect'
+import Recipe from '../models/Recipe'
+import Link from 'next/link'
 import { Fragment, useState } from 'react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
 import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
@@ -22,96 +24,22 @@ const sortOptions = [
   { name: 'Newest', href: '#', current: true },
   { name: 'Oldest', href: '#', current: false },
 ]
-const products = [
-  {
-    id: 1,
-    name: 'Organize Basic Set (Walnut)',
-    price: '$149',
-    rating: 5,
-    reviewCount: 38,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-01.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  {
-    id: 2,
-    name: 'Organize Pen Holder',
-    price: '$15',
-    rating: 5,
-    reviewCount: 18,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-02.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  {
-    id: 3,
-    name: 'Organize Sticky Note Holder',
-    price: '$15',
-    rating: 5,
-    reviewCount: 14,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-03.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  {
-    id: 4,
-    name: 'Organize Phone Holder',
-    price: '$15',
-    rating: 4,
-    reviewCount: 21,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-04.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  {
-    id: 5,
-    name: 'Organize Phone Holder',
-    price: '$15',
-    rating: 4,
-    reviewCount: 21,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-04.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  {
-    id: 6,
-    name: 'Organize Phone Holder',
-    price: '$15',
-    rating: 4,
-    reviewCount: 21,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-04.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  {
-    id: 7,
-    name: 'Organize Phone Holder',
-    price: '$15',
-    rating: 4,
-    reviewCount: 21,
-    imageSrc: 'https://tailwindui.com/img/ecommerce-images/category-page-05-image-card-04.jpg',
-    imageAlt: 'TODO',
-    href: '#',
-  },
-  // More products...
-]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Recipe() {
+export default function Recipes({ recipes }) {
   const [open, setOpen] = useState(false)
 
   return (
     <div className="bg-white">
-
       <main className="pb-24">
         <div className="py-16 px-4 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900">Recipes</h1>
-          <p className="mx-auto mt-4 max-w-xl text-base text-gray-500">
-            
-          </p>
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            Recipes
+          </h1>
+          <p className="mx-auto mt-4 max-w-xl text-base text-gray-500"></p>
         </div>
 
         {/* Filters */}
@@ -148,7 +76,10 @@ export default function Recipe() {
                   <legend className="block font-medium">Price</legend>
                   <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
                     {filters.price.map((option, optionIdx) => (
-                      <div key={option.value} className="flex items-center text-base sm:text-sm">
+                      <div
+                        key={option.value}
+                        className="flex items-center text-base sm:text-sm"
+                      >
                         <input
                           id={`price-${optionIdx}`}
                           name="price[]"
@@ -157,7 +88,10 @@ export default function Recipe() {
                           className="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           defaultChecked={option.checked}
                         />
-                        <label htmlFor={`price-${optionIdx}`} className="ml-3 min-w-0 flex-1 text-gray-600">
+                        <label
+                          htmlFor={`price-${optionIdx}`}
+                          className="ml-3 min-w-0 flex-1 text-gray-600"
+                        >
                           {option.label}
                         </label>
                       </div>
@@ -168,7 +102,10 @@ export default function Recipe() {
                   <legend className="block font-medium">Category</legend>
                   <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
                     {filters.category.map((option, optionIdx) => (
-                      <div key={option.value} className="flex items-center text-base sm:text-sm">
+                      <div
+                        key={option.value}
+                        className="flex items-center text-base sm:text-sm"
+                      >
                         <input
                           id={`category-${optionIdx}`}
                           name="category[]"
@@ -177,7 +114,10 @@ export default function Recipe() {
                           className="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           defaultChecked={option.checked}
                         />
-                        <label htmlFor={`category-${optionIdx}`} className="ml-3 min-w-0 flex-1 text-gray-600">
+                        <label
+                          htmlFor={`category-${optionIdx}`}
+                          className="ml-3 min-w-0 flex-1 text-gray-600"
+                        >
                           {option.label}
                         </label>
                       </div>
@@ -217,7 +157,9 @@ export default function Recipe() {
                             <a
                               href={option.href}
                               className={classNames(
-                                option.current ? 'font-medium text-gray-900' : 'text-gray-500',
+                                option.current
+                                  ? 'font-medium text-gray-900'
+                                  : 'text-gray-500',
                                 active ? 'bg-gray-100' : '',
                                 'block px-4 py-2 text-sm'
                               )}
@@ -236,28 +178,35 @@ export default function Recipe() {
         </Disclosure>
 
         {/* Product grid */}
-        <section aria-labelledby="products-heading" className="mx-auto max-w-7xl overflow-hidden sm:px-6 lg:px-8">
-          <h2 id="products-heading" className="sr-only">
+        <section
+          aria-labelledby="recipes-heading"
+          className="mx-auto max-w-7xl overflow-hidden sm:px-6 lg:px-8"
+        >
+          <h2 id="recipes-heading" className="sr-only">
             Recipes
           </h2>
 
           <div className="-mx-px grid grid-cols-2 border-l border-gray-200 sm:mx-0 md:grid-cols-3 lg:grid-cols-4">
-            {products.map((product) => (
-              <div key={product.id} className="group relative border-r border-b border-gray-200 p-4 sm:p-6">
+            {recipes.reverse().map((recipe) => (
+              <div
+                key={recipe._id}
+                className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
+              >
                 <div className="aspect-w-1 aspect-h-1 overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
                   <img
-                    src={product.imageSrc}
-                    alt={product.imageAlt}
+                    src={recipe.photo}
+                    alt={recipe.name}
                     className="h-full w-full object-cover object-center"
                   />
                 </div>
-                <div className="pt-10 pb-4 text-center">
+                <div className="pt-8 pb-4 text-center">
                   <h3 className="text-sm font-medium text-gray-900">
-                    <a href={product.href}>
+                    <Link href="/[id]" as={`/${recipe._id}`}>
                       <span aria-hidden="true" className="absolute inset-0" />
-                      {product.name}
-                    </a>
+                      {recipe.name}
+                    </Link>
                   </h3>
+                  <span className='text-gray-500 text-xs'>{recipe.cookTime + recipe.prepTime} minutes</span>
                 </div>
               </div>
             ))}
@@ -265,7 +214,7 @@ export default function Recipe() {
         </section>
 
         {/* Pagination */}
-        <nav
+        {/* <nav
           aria-label="Pagination"
           className="mx-auto mt-6 flex max-w-7xl justify-between px-4 text-sm font-medium text-gray-700 sm:px-6 lg:px-8"
         >
@@ -277,9 +226,9 @@ export default function Recipe() {
               Previous
             </a>
           </div>
-          <div className="hidden space-x-2 sm:flex">
-            {/* Current: "border-indigo-600 ring-1 ring-indigo-600", Default: "border-gray-300" */}
-            <a
+          <div className="hidden space-x-2 sm:flex"> */}
+        {/* Current: "border-indigo-600 ring-1 ring-indigo-600", Default: "border-gray-300" */}
+        {/* <a
               href="#"
               className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
@@ -325,8 +274,22 @@ export default function Recipe() {
               Next
             </a>
           </div>
-        </nav>
+        </nav> */}
       </main>
     </div>
   )
+}
+
+export async function getServerSideProps() {
+  await dbConnect()
+
+  /* find all the data in our database */
+  const result = await Recipe.find({})
+  const recipes = result.map((doc) => {
+    const recipe = doc.toObject()
+    recipe._id = recipe._id.toString()
+    return JSON.parse(JSON.stringify(recipe))
+  })
+
+  return { props: { recipes: recipes } }
 }

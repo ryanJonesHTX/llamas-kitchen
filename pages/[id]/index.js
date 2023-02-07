@@ -23,15 +23,13 @@ const RecipePage = ({ recipe }) => {
 
   return (
     <div className="bg-white">
-      <main className="mx-auto mt-8 max-w-2xl px-4 sm:px-6 pb-20 lg:max-w-7xl lg:px-8">
-        <div className="lg:grid lg:grid-cols-12 lg:gap-x-8">
-          <div className="lg:col-span-5 lg:col-start-8">
-            <h1 className="text-xl font-medium text-gray-900">{recipe.name}</h1>
-          </div>
-          <div className="lg:col-start-8 lg:col-span-5">
+      <main className="mx-auto mt-8 max-w-2xl px-4 sm:px-6 pb-20 lg:max-w-4xl lg:px-8">
+        <div className="mx-auto">
+          <h1 className="text-xl font-medium text-gray-900">{recipe.name}</h1>
+          <div className="">
             <h2 className="text-sm font-medium text-gray-900">
               Prep Time:{' '}
-              <span className="prose prose-sm mt-4 pr-4 text-gray-500">
+              <span className="prose prose-sm mt-4 mr-4 pr-4 border-r border-gray-300  text-gray-500">
                 {recipe.prepTime}{' '}
               </span>
               Cook Time:{' '}
@@ -41,19 +39,19 @@ const RecipePage = ({ recipe }) => {
             </h2>
           </div>
           {/* Image */}
-          <div className="mt-8 lg:col-span-7 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:mt-0">
+          <div className="mt-8 lg:mt-4">
             <h2 className="sr-only">Image</h2>
 
-            <div className="grid grid-cols-1 lg:gap-8">
+            <div className="">
               <img
                 src={recipe.photo}
                 alt={recipe.name}
-                className="lg:col-span-2 lg:row-span-2 rounded-lg"
+                className="rounded-lg"
               />
             </div>
           </div>
 
-          <div className="mt-8 lg:col-span-5">
+          <div className="mt-8">
             {/* Ingredients*/}
             <div>
               <h2 className="text-sm font-medium text-gray-900">Ingredients</h2>
@@ -70,18 +68,29 @@ const RecipePage = ({ recipe }) => {
             <div className="mt-8 border-gray-200 pt-8 border-t">
               <h2 className="text-sm font-medium text-gray-900">Directions</h2>
               <div className="prose prose-sm mt-4 text-gray-500">
-                <p>{recipe.directions}</p>
+                <p className="whitespace-pre-line">{recipe.directions}</p>
               </div>
             </div>
-
-            <div className="mt-8 border-gray-200 pt-8 border-t">
-              <h2 className="text-sm font-medium text-gray-900">
-                Submitted by:
-              </h2>
-              <p className="prose prose-sm text-gray-500">
-                {recipe.submittedBy}
-              </p>
-            </div>
+            {recipe.notes && (
+              <div className="mt-8 border-gray-200 pt-8 border-t">
+                <h2 className="text-sm font-medium text-gray-900">
+                  Notes/Tips
+                </h2>
+                <div className="prose prose-sm mt-4 text-gray-500">
+                  <p className="whitespace-pre-line">{recipe.notes}</p>
+                </div>
+              </div>
+            )}
+            {recipe.submittedBy && (
+              <div className="mt-8 border-gray-200 pt-8 border-t pb-8">
+                <h2 className="text-sm font-medium text-gray-900">
+                  Submitted by:
+                </h2>
+                <p className="prose prose-sm text-gray-500">
+                  {recipe.submittedBy}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -117,6 +126,9 @@ const RecipePage = ({ recipe }) => {
             ))}
           </div>
         </section> */}
+    <Link href="/" className='text-xs mt-8 text-gray-500'>
+      Back to Home Page
+    </Link>
       </main>
     </div>
   )
@@ -125,8 +137,9 @@ const RecipePage = ({ recipe }) => {
 export async function getServerSideProps({ params }) {
   await dbConnect()
 
-  const recipe = await Recipe.findById(params.id).lean()
+  let recipe = await Recipe.findById(params.id).lean()
   recipe._id = recipe._id.toString()
+  recipe = JSON.parse(JSON.stringify(recipe))
 
   return { props: { recipe } }
 }

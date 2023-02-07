@@ -25,9 +25,8 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
     cloudinaryId: recipeForm.cloudinaryId,
     category: recipeForm.category,
     submittedBy: recipeForm.submittedBy,
+    notes: recipeForm.notes,
   })
-
-  console.log(form)
 
   /* The PUT method edits an existing entry in the mongodb database. */
   const putData = async (form) => {
@@ -135,7 +134,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
     formData.append('upload_preset', 'recipe-images')
 
     const res = await fetch(
-      `https://api.cloudinary.com/v1_1/dhcbfbegu/image/upload`,
+      `https://api.cloudinary.com/v1_1/dhcbfbegu/image/upload/`,
       {
         method: 'POST',
         body: formData,
@@ -230,7 +229,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
                   onClick={handleAdd}
                   className="rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
-                  Add Ingredient
+                  Add
                 </button>
 
                 <ul
@@ -347,6 +346,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
                     </select>
                   </div>
                 </div>
+                {/* Conditionally display upload/success */}
                 {!uploaded ? (
                   <div className="sm:col-span-6">
                     <label
@@ -396,6 +396,25 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
                     </div>
                   </div>
                 )}
+
+                <div className="sm:col-span-6">
+                  <label
+                    htmlFor="notes"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Notes, Tips or Suggested Sides
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      value={form.notes}
+                      onChange={handleChange}
+                      rows={3}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
 
                 <div className="sm:col-span-6">
                   <label
