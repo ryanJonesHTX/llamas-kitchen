@@ -1,23 +1,26 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
 import Link from 'next/link'
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
 import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
 
 const filters = {
-  price: [
-    { value: '0', label: '$0 - $25', checked: false },
-    { value: '25', label: '$25 - $50', checked: false },
-    { value: '50', label: '$50 - $75', checked: false },
-    { value: '75', label: '$75+', checked: false },
+  time: [
+    { value: '<=80', label: 'Total Time: ~1 Hour' },
+    { value: '>80', label: 'Total Time: > 1 Hour' },
   ],
   category: [
-    { value: 'all-new-arrivals', label: 'All New Arrivals', checked: false },
-    { value: 'tees', label: 'Tees', checked: false },
-    { value: 'objects', label: 'Objects', checked: false },
-    { value: 'sweatshirts', label: 'Sweatshirts', checked: false },
-    { value: 'pants-and-shorts', label: 'Pants & Shorts', checked: false },
+    { value: 'Chicken', label: 'Chicken' },
+    { value: 'Beef', label: 'Beef' },
+    { value: 'Pork', label: 'Pork' },
+    { value: 'Seafood', label: 'Seafood' },
+    { value: 'Vegetarian', label: 'Vegetarian' },
+    { value: 'Pasta', label: 'Pasta' },
+    { value: 'Pizza', label: 'Pizza' },
+    { value: 'Holiday', label: 'Holiday' },
+    { value: 'Sweets', label: 'Sweets' },
+    { value: 'Sides', label: 'Sides' },
   ],
 }
 const sortOptions = [
@@ -31,6 +34,66 @@ function classNames(...classes) {
 
 export default function Recipes({ recipes }) {
   const [open, setOpen] = useState(false)
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [selectedTimeFilter, setSelectedTimeFilter] = useState(null);
+  const [filteredData, setFilteredData] = useState(recipes)
+
+  useEffect(() => {
+    filterData();
+  }, [selectedCategories, selectedTimeFilter]);
+
+  // const filterData = () => {
+  //   let filtered = recipes.filter((item) => selectedCategories.includes(item.category));
+  //   if (selectedTimeFilter === "<=80") {
+  //     filtered = filtered.filter((item) => item.cookTime <= 80);
+  //   } else if (selectedTimeFilter === ">80") {
+  //     filtered = filtered.filter((item) => (item.cookTime + item.prepTime) > 80);
+  //   }
+  //   console.log(filtered)
+  //   setFilteredData(filtered);
+  // };
+
+  const filterData = () => {
+    let filteredData = [...recipes];
+  
+    if (selectedCategories.length > 0) {
+      filteredData = filteredData.filter((item) => {
+        return selectedCategories.includes(item.category);
+      });
+    }
+  
+    if (selectedTimeFilter) {
+      filteredData = filteredData.filter((item) => {
+        if (selectedTimeFilter === "<=80") {
+          return (item.cookTime + item.prepTime) <= 80;
+        } else if (selectedTimeFilter === ">80") {
+          return (item.cookTime + item.prepTime) > 80;
+        }
+        return true;
+      });
+    }
+  
+    setFilteredData(filteredData);
+  };
+
+  console.log(selectedCategories, selectedTimeFilter)
+
+  const handleCategoryChange = (category) => {
+    if (selectedCategories.includes(category)) {
+      setSelectedCategories(selectedCategories.filter((c) => c !== category))
+    } else {
+      setSelectedCategories([...selectedCategories, category])
+    }
+  }
+
+  const handleTimeFilterChange = (e) => {
+    setSelectedTimeFilter(e.target.value);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedCategories([])
+    setSelectedTimeFilter(null)
+  }
 
   return (
     <div className="bg-white">
@@ -59,11 +122,11 @@ export default function Recipes({ recipes }) {
                     className="mr-2 h-5 w-5 flex-none text-gray-400 group-hover:text-gray-500"
                     aria-hidden="true"
                   />
-                  2 Filters
+                  {!selectedTimeFilter ? selectedCategories.length : selectedCategories.length + 1} Filters
                 </Disclosure.Button>
               </div>
               <div className="pl-6">
-                <button type="button" className="text-gray-500">
+                <button type="button" className="text-gray-500" onClick={handleClearFilters}>
                   Clear all
                 </button>
               </div>
@@ -73,23 +136,23 @@ export default function Recipes({ recipes }) {
             <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
               <div className="grid auto-rows-min grid-cols-1 gap-y-10 md:grid-cols-2 md:gap-x-6">
                 <fieldset>
-                  <legend className="block font-medium">Price</legend>
+                  <legend className="block font-medium">Ready to eat</legend>
                   <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                    {filters.price.map((option, optionIdx) => (
+                    {filters.time.map((option, optionIdx) => (
                       <div
                         key={option.value}
                         className="flex items-center text-base sm:text-sm"
                       >
                         <input
-                          id={`price-${optionIdx}`}
-                          name="price[]"
+                          id={`time-${optionIdx}`}
+                          name="time[]"
                           defaultValue={option.value}
-                          type="checkbox"
+                          type="radio"
                           className="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          defaultChecked={option.checked}
+                          onChange={handleTimeFilterChange}
                         />
                         <label
-                          htmlFor={`price-${optionIdx}`}
+                          htmlFor={`time-${optionIdx}`}
                           className="ml-3 min-w-0 flex-1 text-gray-600"
                         >
                           {option.label}
@@ -112,7 +175,7 @@ export default function Recipes({ recipes }) {
                           defaultValue={option.value}
                           type="checkbox"
                           className="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          defaultChecked={option.checked}
+                          onChange={() => handleCategoryChange(option.value)}
                         />
                         <label
                           htmlFor={`category-${optionIdx}`}
@@ -187,7 +250,8 @@ export default function Recipes({ recipes }) {
           </h2>
 
           <div className="-mx-px grid grid-cols-2 border-l border-gray-200 sm:mx-0 md:grid-cols-3 lg:grid-cols-4">
-            {recipes.reverse().map((recipe) => (
+          {filteredData.length > 0 || selectedCategories.length > 0 ? 
+            filteredData.map((recipe) => (
               <div
                 key={recipe._id}
                 className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
@@ -206,11 +270,43 @@ export default function Recipes({ recipes }) {
                       {recipe.name}
                     </Link>
                   </h3>
-                  <span className='text-gray-500 text-xs'>{recipe.cookTime + recipe.prepTime} minutes</span>
+                  <span className="text-gray-500 text-xs">
+                    {recipe.cookTime + recipe.prepTime} minutes
+                  </span>
                 </div>
               </div>
-            ))}
+            ))
+            :
+           recipes.map((recipe) => (
+            <div
+              key={recipe._id}
+              className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
+            >
+              <div className="aspect-w-1 aspect-h-1 overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
+                <img
+                  src={recipe.photo}
+                  alt={recipe.name}
+                  className="h-full w-full object-cover object-center"
+                />
+              </div>
+              <div className="pt-8 pb-4 text-center">
+                <h3 className="text-sm font-medium text-gray-900">
+                  <Link href="/[id]" as={`/${recipe._id}`}>
+                    <span aria-hidden="true" className="absolute inset-0" />
+                    {recipe.name}
+                  </Link>
+                </h3>
+                <span className="text-gray-500 text-xs">
+                  {recipe.cookTime + recipe.prepTime} minutes
+                </span>
+              </div>
+            </div>
+          ))} 
+          
+            
+            
           </div>
+
         </section>
 
         {/* Pagination */}

@@ -339,10 +339,12 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
                       <option>Beef</option>
                       <option>Pork</option>
                       <option>Seafood</option>
-                      <option>Pasta</option>
                       <option>Vegetarian</option>
+                      <option>Pasta</option>
+                      <option>Pizza</option>
+                      <option>Holiday</option>
                       <option>Dessert</option>
-                      <option>Other</option>
+                      <option>Sides</option>
                     </select>
                   </div>
                 </div>
