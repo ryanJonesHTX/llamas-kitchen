@@ -1,7 +1,9 @@
 import Link from 'next/link'
 
 export default function Recipecard({ recipes }) {
-  const latestRecipes = recipes.reverse().slice(0,4)
+  const latestRecipes = recipes.sort((a, b) => {
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  }).slice(0,4)
   return (
     <div className="bg-white">
       <div className="mx-auto max-w-2xl py-16 px-4 sm:py-24 sm:px-6 lg:max-w-7xl lg:px-8">

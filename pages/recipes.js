@@ -24,8 +24,8 @@ const filters = {
   ],
 }
 const sortOptions = [
-  { name: 'Newest', href: '#', current: true },
-  { name: 'Oldest', href: '#', current: false },
+  { name: 'Newest', value: 'descending', current: true },
+  { name: 'Oldest', value: 'ascending', current: false },
 ]
 
 function classNames(...classes) {
@@ -35,48 +35,101 @@ function classNames(...classes) {
 export default function Recipes({ recipes }) {
   const [open, setOpen] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState([])
-  const [selectedTimeFilter, setSelectedTimeFilter] = useState(null);
-  const [filteredData, setFilteredData] = useState(recipes)
+  const [selectedTimeFilter, setSelectedTimeFilter] = useState(null)
+  const [recipeList, setRecipeList] = useState(recipes)
+  const [filteredData, setFilteredData] = useState(recipeList)
+  const [sortOption, setSortOption] = useState('descending')
 
   useEffect(() => {
-    filterData();
-  }, [selectedCategories, selectedTimeFilter]);
+    filterData()
+  }, [selectedCategories, selectedTimeFilter, sortOption])
 
-  // const filterData = () => {
-  //   let filtered = recipes.filter((item) => selectedCategories.includes(item.category));
-  //   if (selectedTimeFilter === "<=80") {
-  //     filtered = filtered.filter((item) => item.cookTime <= 80);
-  //   } else if (selectedTimeFilter === ">80") {
-  //     filtered = filtered.filter((item) => (item.cookTime + item.prepTime) > 80);
-  //   }
-  //   console.log(filtered)
-  //   setFilteredData(filtered);
-  // };
+  const handleSort = (value) => {
+    sortOptions.forEach((option) => {
+      if (option.value === value) {
+        option.current = true
+      } else {
+        option.current = false
+      }
+    })
+    console.log(value)
+
+    setSortOption(value)
+  }
 
   const filterData = () => {
-    let filteredData = [...recipes];
-  
+    let filteredData = [...recipeList]
+
     if (selectedCategories.length > 0) {
       filteredData = filteredData.filter((item) => {
-        return selectedCategories.includes(item.category);
-      });
+        return selectedCategories.includes(item.category)
+      })
     }
-  
+
     if (selectedTimeFilter) {
       filteredData = filteredData.filter((item) => {
-        if (selectedTimeFilter === "<=80") {
-          return (item.cookTime + item.prepTime) <= 80;
-        } else if (selectedTimeFilter === ">80") {
-          return (item.cookTime + item.prepTime) > 80;
+        if (selectedTimeFilter === '<=80') {
+          return item.cookTime + item.prepTime <= 80
+        } else if (selectedTimeFilter === '>80') {
+          return item.cookTime + item.prepTime > 80
         }
-        return true;
-      });
+        return true
+      })
     }
-  
-    setFilteredData(filteredData);
-  };
 
-  console.log(selectedCategories, selectedTimeFilter)
+    setFilteredData(filteredData)
+  }
+
+  function applyFilterAndSort(
+    recipeList,
+    filteredData,
+    selectedCategories,
+    selectedTimeFilter,
+    sortOption
+  ) {
+    let filteredAndSortedData = recipeList
+
+    if (filteredData.length > 0) {
+      filteredAndSortedData = filteredData
+    }
+
+    if (selectedCategories.length > 0) {
+      filteredAndSortedData = filteredAndSortedData.filter((recipe) =>
+        selectedCategories.includes(recipe.category)
+      )
+    }
+
+    if (selectedTimeFilter) {
+      filteredAndSortedData = filteredData.filter((item) => {
+        if (selectedTimeFilter === '<=80') {
+          return item.cookTime + item.prepTime <= 80
+        } else if (selectedTimeFilter === '>80') {
+          return item.cookTime + item.prepTime > 80
+        }
+        return true
+      })
+    }
+
+    if (sortOption === 'ascending') {
+      filteredAndSortedData = filteredAndSortedData.sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+      )
+    } else if (sortOption === 'descending') {
+      filteredAndSortedData = filteredAndSortedData.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      )
+    }
+
+    return filteredAndSortedData
+  }
+
+  const filteredAndSortedData = applyFilterAndSort(
+    recipeList,
+    filteredData,
+    selectedCategories,
+    selectedTimeFilter,
+    sortOption
+  )
 
   const handleCategoryChange = (category) => {
     if (selectedCategories.includes(category)) {
@@ -87,13 +140,21 @@ export default function Recipes({ recipes }) {
   }
 
   const handleTimeFilterChange = (e) => {
-    setSelectedTimeFilter(e.target.value);
-  };
+    setSelectedTimeFilter(e.target.value)
+  }
 
   const handleClearFilters = () => {
     setSelectedCategories([])
     setSelectedTimeFilter(null)
+    const checkboxes = document.querySelectorAll("input[type='checkbox']")
+    const radioButtons = document.querySelectorAll("input[type='radio']")
+    checkboxes.forEach((checkbox) => (checkbox.checked = false))
+    radioButtons.forEach((radio) => (radio.checked = false))
   }
+
+  let filterCount = !selectedTimeFilter
+    ? selectedCategories.length
+    : selectedCategories.length + 1
 
   return (
     <div className="bg-white">
@@ -122,11 +183,15 @@ export default function Recipes({ recipes }) {
                     className="mr-2 h-5 w-5 flex-none text-gray-400 group-hover:text-gray-500"
                     aria-hidden="true"
                   />
-                  {!selectedTimeFilter ? selectedCategories.length : selectedCategories.length + 1} Filters
+                  {filterCount} {filterCount === 1 ? 'Filter' : 'Filters'}
                 </Disclosure.Button>
               </div>
               <div className="pl-6">
-                <button type="button" className="text-gray-500" onClick={handleClearFilters}>
+                <button
+                  type="button"
+                  className="text-gray-500"
+                  onClick={handleClearFilters}
+                >
                   Clear all
                 </button>
               </div>
@@ -215,10 +280,10 @@ export default function Recipes({ recipes }) {
                   <Menu.Items className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <div className="py-1">
                       {sortOptions.map((option) => (
-                        <Menu.Item key={option.name}>
+                        <Menu.Item key={option.value}>
                           {({ active }) => (
-                            <a
-                              href={option.href}
+                            <span
+                              onClick={() => handleSort(option.value)}
                               className={classNames(
                                 option.current
                                   ? 'font-medium text-gray-900'
@@ -228,7 +293,7 @@ export default function Recipes({ recipes }) {
                               )}
                             >
                               {option.name}
-                            </a>
+                            </span>
                           )}
                         </Menu.Item>
                       ))}
@@ -250,8 +315,7 @@ export default function Recipes({ recipes }) {
           </h2>
 
           <div className="-mx-px grid grid-cols-2 border-l border-gray-200 sm:mx-0 md:grid-cols-3 lg:grid-cols-4">
-          {filteredData.length > 0 || selectedCategories.length > 0 ? 
-            filteredData.map((recipe) => (
+            {filteredAndSortedData.map((recipe) => (
               <div
                 key={recipe._id}
                 className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
@@ -275,38 +339,8 @@ export default function Recipes({ recipes }) {
                   </span>
                 </div>
               </div>
-            ))
-            :
-           recipes.map((recipe) => (
-            <div
-              key={recipe._id}
-              className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
-            >
-              <div className="aspect-w-1 aspect-h-1 overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
-                <img
-                  src={recipe.photo}
-                  alt={recipe.name}
-                  className="h-full w-full object-cover object-center"
-                />
-              </div>
-              <div className="pt-8 pb-4 text-center">
-                <h3 className="text-sm font-medium text-gray-900">
-                  <Link href="/[id]" as={`/${recipe._id}`}>
-                    <span aria-hidden="true" className="absolute inset-0" />
-                    {recipe.name}
-                  </Link>
-                </h3>
-                <span className="text-gray-500 text-xs">
-                  {recipe.cookTime + recipe.prepTime} minutes
-                </span>
-              </div>
-            </div>
-          ))} 
-          
-            
-            
+            ))}
           </div>
-
         </section>
 
         {/* Pagination */}
@@ -386,6 +420,7 @@ export async function getServerSideProps() {
     recipe._id = recipe._id.toString()
     return JSON.parse(JSON.stringify(recipe))
   })
+
 
   return { props: { recipes: recipes } }
 }
