@@ -426,6 +426,7 @@ export async function getServerSideProps() {
   return { props: { recipes: recipes } }
   } catch (e) {
     console.error(e)
+    return { props: {} }
   }
 
 }
