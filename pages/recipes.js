@@ -412,7 +412,7 @@ export default function Recipes({ recipes }) {
 
 export async function getServerSideProps() {
 
-  try{  await dbConnect()
+  try { await dbConnect()
 
   /* find all the data in our database */
   const result = await Recipe.find({})

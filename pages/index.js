@@ -16,7 +16,8 @@ const Index = ( { recipes }) => {
 
 // /* Retrieves recipe data from mongodb database */
 export async function getServerSideProps() {
-  await dbConnect()
+
+  try { await dbConnect()
 
   /* find all the data in our database */
   const result = await Recipe.find({})
@@ -26,8 +27,10 @@ export async function getServerSideProps() {
     return JSON.parse(JSON.stringify(recipe))
   })
 
+
   return { props: { recipes: recipes } }
+  } catch (e) {
+    console.error(e)
+  }
+
 }
-
-
-export default Index
