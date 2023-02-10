@@ -1,6 +1,8 @@
 import dbConnect from '../../../lib/dbConnect'
 import Recipe from '../../../models/Recipe'
 
+// const results = await Data.find({ name: { $regex: searchTerm, $options: 'i' } });
+
 export default async function handler(req, res) {
   const {
     query: { id },

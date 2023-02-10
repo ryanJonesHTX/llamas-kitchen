@@ -8,18 +8,18 @@ import Recipe from '../../models/Recipe'
 const RecipePage = ({ recipe }) => {
   const router = useRouter()
   const [message, setMessage] = useState('')
-  const handleDelete = async () => {
-    const recipeID = router.query.id
+  // const handleDelete = async () => {
+  //   const recipeID = router.query.id
 
-    try {
-      await fetch(`/api/recipe/${recipeID}`, {
-        method: 'Delete',
-      })
-      router.push('/')
-    } catch (error) {
-      setMessage('Failed to delete the recipe.')
-    }
-  }
+  //   try {
+  //     await fetch(`/api/recipe/${recipeID}`, {
+  //       method: 'Delete',
+  //     })
+  //     router.push('/')
+  //   } catch (error) {
+  //     setMessage('Failed to delete the recipe.')
+  //   }
+  // }
 
   return (
     <div className="bg-white">

@@ -14,7 +14,7 @@ const Index = ( { recipes }) => {
   )
 }
 
-// /* Retrieves pet(s) data from mongodb database */
+// /* Retrieves recipe data from mongodb database */
 export async function getServerSideProps() {
   await dbConnect()
 
