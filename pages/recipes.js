@@ -411,7 +411,8 @@ export default function Recipes({ recipes }) {
 }
 
 export async function getServerSideProps() {
-  await dbConnect()
+
+  try{  await dbConnect()
 
   /* find all the data in our database */
   const result = await Recipe.find({})
@@ -423,4 +424,8 @@ export async function getServerSideProps() {
 
 
   return { props: { recipes: recipes } }
+  } catch (e) {
+    console.error(e)
+  }
+
 }
