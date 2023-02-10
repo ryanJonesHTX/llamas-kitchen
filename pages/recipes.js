@@ -41,7 +41,28 @@ export default function Recipes({ recipes }) {
   const [sortOption, setSortOption] = useState('descending')
 
   useEffect(() => {
-    filterData()
+    const filterData = () => {
+      let filteredData = [...recipeList]
+  
+      if (selectedCategories.length > 0) {
+        filteredData = filteredData.filter((item) => {
+          return selectedCategories.includes(item.category)
+        })
+      }
+  
+      if (selectedTimeFilter) {
+        filteredData = filteredData.filter((item) => {
+          if (selectedTimeFilter === '<=80') {
+            return item.cookTime + item.prepTime <= 80
+          } else if (selectedTimeFilter === '>80') {
+            return item.cookTime + item.prepTime > 80
+          }
+          return true
+        })
+      }
+  
+      setFilteredData(filteredData)
+    }
   }, [selectedCategories, selectedTimeFilter, sortOption])
 
   const handleSort = (value) => {
@@ -57,28 +78,7 @@ export default function Recipes({ recipes }) {
     setSortOption(value)
   }
 
-  const filterData = () => {
-    let filteredData = [...recipeList]
 
-    if (selectedCategories.length > 0) {
-      filteredData = filteredData.filter((item) => {
-        return selectedCategories.includes(item.category)
-      })
-    }
-
-    if (selectedTimeFilter) {
-      filteredData = filteredData.filter((item) => {
-        if (selectedTimeFilter === '<=80') {
-          return item.cookTime + item.prepTime <= 80
-        } else if (selectedTimeFilter === '>80') {
-          return item.cookTime + item.prepTime > 80
-        }
-        return true
-      })
-    }
-
-    setFilteredData(filteredData)
-  }
 
   function applyFilterAndSort(
     recipeList,
