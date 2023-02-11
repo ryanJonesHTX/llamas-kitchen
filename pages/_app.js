@@ -25,8 +25,3 @@ function MyApp({ Component, pageProps }) {
 }
 
 export default MyApp
-
-
-{/* <Head>
-<title>Llamas Kitchen</title>
-</Head> */}

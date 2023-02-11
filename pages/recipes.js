@@ -1,6 +1,7 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
 import Link from 'next/link'
+import Head from 'next/head'
 import { Fragment, useState, useEffect } from 'react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
 import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
@@ -43,13 +44,13 @@ export default function Recipes({ recipes }) {
   useEffect(() => {
     const filterData = () => {
       let filteredData = [...recipeList]
-  
+
       if (selectedCategories.length > 0) {
         filteredData = filteredData.filter((item) => {
           return selectedCategories.includes(item.category)
         })
       }
-  
+
       if (selectedTimeFilter) {
         filteredData = filteredData.filter((item) => {
           if (selectedTimeFilter === '<=80') {
@@ -60,7 +61,7 @@ export default function Recipes({ recipes }) {
           return true
         })
       }
-  
+
       setFilteredData(filteredData)
     }
   }, [selectedCategories, selectedTimeFilter, sortOption])
@@ -77,8 +78,6 @@ export default function Recipes({ recipes }) {
 
     setSortOption(value)
   }
-
-
 
   function applyFilterAndSort(
     recipeList,
@@ -158,6 +157,9 @@ export default function Recipes({ recipes }) {
 
   return (
     <div className="bg-white">
+      <Head>
+        <title>Llamas Kitchen</title>
+      </Head>
       <main className="pb-24">
         <div className="py-16 px-4 text-center sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">
@@ -411,22 +413,20 @@ export default function Recipes({ recipes }) {
 }
 
 export async function getServerSideProps() {
+  try {
+    await dbConnect()
 
-  try { await dbConnect()
+    /* find all the data in our database */
+    const result = await Recipe.find({})
+    const recipes = result.map((doc) => {
+      const recipe = doc.toObject()
+      recipe._id = recipe._id.toString()
+      return JSON.parse(JSON.stringify(recipe))
+    })
 
-  /* find all the data in our database */
-  const result = await Recipe.find({})
-  const recipes = result.map((doc) => {
-    const recipe = doc.toObject()
-    recipe._id = recipe._id.toString()
-    return JSON.parse(JSON.stringify(recipe))
-  })
-
-
-  return { props: { recipes: recipes } }
+    return { props: { recipes: recipes } }
   } catch (e) {
     console.error(e)
     return { props: {} }
   }
-
 }

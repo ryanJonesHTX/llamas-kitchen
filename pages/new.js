@@ -1,4 +1,6 @@
 import Form from '../components/Form'
+import Head from 'next/head'
+
 
 const NewRecipe = () => {
   const recipeForm = {
@@ -14,8 +16,13 @@ const NewRecipe = () => {
     notes: '',
   }
 
-
-  return <Form formId="add-recipe-form" recipeForm={recipeForm}/>
-}
+  return(
+  <>
+    <Head>
+      <title>Llamas Kitchen</title>
+    </Head>
+    <Form formId="add-recipe-form" recipeForm={recipeForm} />
+  </>
+)}
 
 export default NewRecipe
