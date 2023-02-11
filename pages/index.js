@@ -1,5 +1,6 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
+import Head from 'next/head'
 import LatestRecipes from '../components/LatestRecipes'
 import Landing from '../components/Landing'
 
