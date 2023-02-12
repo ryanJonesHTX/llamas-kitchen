@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
+import MyCombobox from './MyCombobox'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
-import { MagnifyingGlassIcon } from '@heroicons/react/20/solid'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -10,7 +10,7 @@ const navigation = [
   { name: 'Add Recipe', href: '/new' },
 ]
 
-export default function Landing() {
+export default function Landing({ recipes }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
@@ -35,8 +35,8 @@ export default function Landing() {
                 <span className="sr-only">Llama's Kitchen</span>
                 <img
                   alt="Llama's Kitchen"
-                  className="h-8 w-auto"
-                  src="https://img.freepik.com/free-vector/cute-alpaca-llama-cartoon-animal-nature-icon-concept-isolated-flat-cartoon-style_138676-2181.jpg?w=1800&t=st=1675133471~exp=1675134071~hmac=7dec50e0f322f3ddacebd69d37ccd456787124dcd886101725b6b8b060dbce46"
+                  className="h-12 w-auto"
+                  src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
                 />
               </Link>
               <button
@@ -59,7 +59,7 @@ export default function Landing() {
                 ))}
               </div>
               <div className="hidden lg:flex lg:flex-1 justify-center px-2 lg:ml-12 lg:justify-end">
-                <div className="w-full max-w-lg lg:max-w-xs">
+                {/* <div className="w-full max-w-lg lg:max-w-xs">
                   <label htmlFor="search" className="sr-only">
                     Search
                   </label>
@@ -78,7 +78,8 @@ export default function Landing() {
                       name="search"
                     />
                   </div>
-                </div>
+                </div> */}
+                <MyCombobox recipes={recipes} />
               </div>
             </nav>
             <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
@@ -95,8 +96,8 @@ export default function Landing() {
                   <Link href="/" className="-m-1.5 p-1.5">
                     <span className="sr-only">Llama's Kitchen</span>
                     <img
-                      className="h-8"
-                      src="https://img.freepik.com/free-vector/cute-alpaca-llama-cartoon-animal-nature-icon-concept-isolated-flat-cartoon-style_138676-2181.jpg?w=1800&t=st=1675133471~exp=1675134071~hmac=7dec50e0f322f3ddacebd69d37ccd456787124dcd886101725b6b8b060dbce46"
+                      className="h-12"
+                      src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
                       alt="Llama's Kitchen"
                     />
                   </Link>
@@ -112,7 +113,8 @@ export default function Landing() {
                     </Link>
                   ))}
                   <div className="flex flex-1 justify-center px-2 lg:ml-6 lg:justify-end">
-                    <div className="w-full max-w-lg lg:max-w-xs">
+                  <MyCombobox recipes={recipes} />
+                    {/* <div className="w-full max-w-lg lg:max-w-xs">
                       <label htmlFor="search" className="sr-only">
                         Search
                       </label>
@@ -131,7 +133,7 @@ export default function Landing() {
                           name="search"
                         />
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </Dialog.Panel>
@@ -167,9 +169,9 @@ export default function Landing() {
       </div>
       <div className="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
         <img
-          className="aspect-[3/2] object-cover lg:aspect-auto lg:h-full lg:w-full"
-          src="https://images.unsplash.com/photo-1552326081-9dbfc0760ad5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80"
-          alt=""
+          className="aspect-[4/3] object-cover lg:aspect-auto lg:h-full lg:w-full"
+          src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676182454/llama_rmoylj.webp"
+          alt="Llama's Kitchen"
         />
       </div>
     </div>

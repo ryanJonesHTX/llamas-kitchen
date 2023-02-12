@@ -2,8 +2,6 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
-import { MagnifyingGlassIcon } from '@heroicons/react/20/solid'
-import MyCombobox from './MyCombobox'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -11,7 +9,7 @@ const navigation = [
   { name: 'Add Recipe', href: '/new' },
 ]
 
-export default function Nav({ recipes }) {
+export default function NavNoSearch({ recipes }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
@@ -49,29 +47,6 @@ export default function Nav({ recipes }) {
                 </Link>
               ))}
             </div>
-            <div className="hidden lg:flex lg:mr-8 lg:ml-auto">
-              <MyCombobox recipes={recipes} />
-              {/* <div className="w-full max-w-lg lg:max-w-xs">
-                <label htmlFor="search" className="sr-only">
-                  Search
-                </label>
-                <div className="relative text-gray-400 focus-within:text-gray-600">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <MagnifyingGlassIcon
-                      className="h-5 w-5"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <input
-                    id="search"
-                    className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
-                    placeholder="Search"
-                    type="search"
-                    name="search"
-                  />
-                </div>
-              </div> */}
-            </div>
           </nav>
           <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
             <Dialog.Panel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
@@ -89,7 +64,7 @@ export default function Nav({ recipes }) {
                   <img
                     className="h-12"
                     src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                    alt="Llama's Kitchen"
+                    alt="Llama Icon"
                   />
                 </Link>
               </div>
@@ -103,29 +78,6 @@ export default function Nav({ recipes }) {
                     {item.name}
                   </Link>
                 ))}
-                <div className="flex flex-1 px-2 lg:hidden">
-                        <MyCombobox recipes={recipes} />
-                  {/* <div className="w-full max-w-lg lg:max-w-xs">
-                    <label htmlFor="search" className="sr-only">
-                      Search
-                    </label>
-                    <div className="relative text-gray-400 focus-within:text-gray-600">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <MagnifyingGlassIcon
-                          className="h-5 w-5"
-                          aria-hidden="true"
-                        />
-                      </div>
-                      <input
-                        id="search"
-                        className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
-                        placeholder="Search"
-                        type="search"
-                        name="search"
-                      />
-                    </div>
-                  </div> */}
-                </div>
               </div>
             </Dialog.Panel>
           </Dialog>
