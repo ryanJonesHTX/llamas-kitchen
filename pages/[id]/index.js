@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Link from 'next/link'
 import dbConnect from '../../lib/dbConnect'
 import Recipe from '../../models/Recipe'
+import NavNosearch from '../../components/NavNoSearch'
 
 /* Allows you to view pet card info and delete pet card*/
 const RecipePage = ({ recipe }) => {
@@ -23,6 +24,7 @@ const RecipePage = ({ recipe }) => {
 
   return (
     <div className="bg-white">
+      <NavNosearch />
       <main className="mx-auto mt-8 max-w-2xl px-4 sm:px-6 pb-20 lg:max-w-4xl lg:px-8">
         <div className="mx-auto">
           <h1 className="text-xl font-medium text-gray-900">{recipe.name}</h1>

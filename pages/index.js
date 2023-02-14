@@ -10,7 +10,7 @@ const Index = ({ recipes }) => {
       <Head>
         <title>Llamas Kitchen</title>
       </Head>
-      <Landing />
+      <Landing recipes={recipes}/>
       <LatestRecipes recipes={recipes} />
     </>
   )

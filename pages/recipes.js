@@ -1,5 +1,6 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
+import Nav from '../components/Nav'
 import Link from 'next/link'
 import Head from 'next/head'
 import { Fragment, useState, useEffect } from 'react'
@@ -158,8 +159,9 @@ export default function Recipes({ recipes }) {
   return (
     <div className="bg-white">
       <Head>
-        <title>Llamas Kitchen</title>
+        <title>Llamas Kitchen - Recipes</title>
       </Head>
+      <Nav recipes={recipes} />
       <main className="pb-24">
         <div className="py-16 px-4 text-center sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">

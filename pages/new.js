@@ -1,5 +1,6 @@
 import Form from '../components/Form'
 import Head from 'next/head'
+import NavNosearch from '../components/NavNoSearch'
 
 
 const NewRecipe = () => {
@@ -19,8 +20,9 @@ const NewRecipe = () => {
   return(
   <>
     <Head>
-      <title>Llamas Kitchen</title>
+      <title>Llamas Kitchen - Add Recipe</title>
     </Head>
+    <NavNosearch />
     <Form formId="add-recipe-form" recipeForm={recipeForm} />
   </>
 )}
