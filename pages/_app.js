@@ -26,15 +26,9 @@ function MyApp({ Component, pageProps }) {
           href="/images/favicon-16x16.png"
         /> */}
       </Head>
-      {router.pathname === '/' ? (
         <>
           <Component {...pageProps} />
         </>
-      ) : (
-        <>
-          <Component {...pageProps} />
-        </>
-      )}
     </>
   )
 }

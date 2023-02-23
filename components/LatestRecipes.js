@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image';
 
 export default function Recipecard({ recipes }) {
   const latestRecipes = recipes.sort((a, b) => {
@@ -24,10 +25,12 @@ export default function Recipecard({ recipes }) {
           {latestRecipes.map((recipe) => (
             <div key={recipe._id} className="group relative">
               <div className="h-56 w-full overflow-hidden rounded-md bg-gray-200 group-hover:opacity-75 lg:h-72 xl:h-80">
-                <img
+                <Image
                   src={recipe.photo}
                   alt={recipe.name}
                   className="h-full w-full object-cover object-center"
+                  width={300}
+                  height={250}
                 />
               </div>
               <h3 className="mt-4 text-sm text-gray-700">

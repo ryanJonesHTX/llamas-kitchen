@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import MyCombobox from './MyCombobox'
 import { Dialog } from '@headlessui/react'
@@ -33,11 +34,13 @@ export default function Landing({ recipes }) {
             >
               <Link href="/" className="-m-1.5 p-1.5">
                 <span className="sr-only">Llama's Kitchen</span>
-                <img
-                  alt="Llama's Kitchen"
-                  className="h-12 w-auto"
-                  src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                />
+                <Image
+                alt="Llama's Kitchen"
+                className="h-12 w-auto"
+                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
+                width={48}
+                height={48}
+              />
               </Link>
               <button
                 type="button"
@@ -95,11 +98,13 @@ export default function Landing({ recipes }) {
                   </button>
                   <Link href="/" className="-m-1.5 p-1.5">
                     <span className="sr-only">Llama's Kitchen</span>
-                    <img
-                      className="h-12"
-                      src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                      alt="Llama's Kitchen"
-                    />
+                    <Image
+                alt="Llama's Kitchen"
+                className="h-12"
+                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
+                width={48}
+                height={48}
+              />
                   </Link>
                 </div>
                 <div className="mt-6 space-y-2">

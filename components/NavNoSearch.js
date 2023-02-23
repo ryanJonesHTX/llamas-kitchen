@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
@@ -22,10 +23,12 @@ export default function NavNoSearch({ recipes }) {
           >
             <Link href="/" className="-m-1.5 p-1.5">
               <span className="sr-only">Llama's Kitchen</span>
-              <img
+              <Image
                 alt="Llama's Kitchen"
                 className="h-12 w-auto"
                 src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
+                width={48}
+                height={48}
               />
             </Link>
             <button
@@ -61,11 +64,13 @@ export default function NavNoSearch({ recipes }) {
                 </button>
                 <Link href="/" className="-m-1.5 p-1.5">
                   <span className="sr-only">Llama's Kitchen</span>
-                  <img
-                    className="h-12"
-                    src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                    alt="Llama Icon"
-                  />
+                  <Image
+                alt="Llama's Kitchen"
+                className="h-12 w-auto"
+                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
+                width={48}
+                height={48}
+              />
                 </Link>
               </div>
               <div className="mt-6 space-y-2">

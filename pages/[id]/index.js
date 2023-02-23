@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import Image from 'next/image'
 import dbConnect from '../../lib/dbConnect'
 import Recipe from '../../models/Recipe'
 import NavNosearch from '../../components/NavNoSearch'
+import autoprefixer from 'autoprefixer'
 
 /* Allows you to view pet card info and delete pet card*/
 const RecipePage = ({ recipe }) => {
@@ -44,10 +46,12 @@ const RecipePage = ({ recipe }) => {
           <div className="mt-8 lg:mt-4">
             <h2 className="sr-only">Image</h2>
 
-            <div className="">
-              <img
+            <div className="max-w-2xl lg:max-w-4xl">
+              <Image
                 src={recipe.photo}
                 alt={recipe.name}
+                width={700}
+                height={600}
                 className="rounded-lg"
               />
             </div>

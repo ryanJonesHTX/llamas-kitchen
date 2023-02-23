@@ -3,6 +3,7 @@ import Recipe from '../models/Recipe'
 import Nav from '../components/Nav'
 import Link from 'next/link'
 import Head from 'next/head'
+import Image from 'next/image'
 import { Fragment, useState, useEffect } from 'react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
 import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
@@ -38,34 +39,17 @@ export default function Recipes({ recipes }) {
   const [open, setOpen] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState([])
   const [selectedTimeFilter, setSelectedTimeFilter] = useState(null)
-  const [recipeList, setRecipeList] = useState(recipes)
-  const [filteredData, setFilteredData] = useState(recipeList)
+  const [filteredData, setFilteredData] = useState(recipes)
   const [sortOption, setSortOption] = useState('descending')
 
   useEffect(() => {
-    const filterData = () => {
-      let filteredData = [...recipeList]
-
-      if (selectedCategories.length > 0) {
-        filteredData = filteredData.filter((item) => {
-          return selectedCategories.includes(item.category)
-        })
-      }
-
-      if (selectedTimeFilter) {
-        filteredData = filteredData.filter((item) => {
-          if (selectedTimeFilter === '<=80') {
-            return item.cookTime + item.prepTime <= 80
-          } else if (selectedTimeFilter === '>80') {
-            return item.cookTime + item.prepTime > 80
-          }
-          return true
-        })
-      }
-
-      setFilteredData(filteredData)
-    }
-  }, [selectedCategories, selectedTimeFilter, sortOption])
+    applyFilterAndSort(
+      filteredData,
+      selectedCategories,
+      selectedTimeFilter,
+      sortOption
+    )
+  }, [selectedCategories, selectedTimeFilter, sortOption, filteredData])
 
   const handleSort = (value) => {
     sortOptions.forEach((option) => {
@@ -81,13 +65,12 @@ export default function Recipes({ recipes }) {
   }
 
   function applyFilterAndSort(
-    recipeList,
     filteredData,
     selectedCategories,
     selectedTimeFilter,
     sortOption
   ) {
-    let filteredAndSortedData = recipeList
+    let filteredAndSortedData = filteredData
 
     if (filteredData.length > 0) {
       filteredAndSortedData = filteredData
@@ -124,7 +107,6 @@ export default function Recipes({ recipes }) {
   }
 
   const filteredAndSortedData = applyFilterAndSort(
-    recipeList,
     filteredData,
     selectedCategories,
     selectedTimeFilter,
@@ -325,10 +307,12 @@ export default function Recipes({ recipes }) {
                 className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
               >
                 <div className="aspect-w-1 aspect-h-1 overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
-                  <img
+                  <Image
                     src={recipe.photo}
                     alt={recipe.name}
                     className="h-full w-full object-cover object-center"
+                    width={300}
+                  height={250}
                   />
                 </div>
                 <div className="pt-8 pb-4 text-center">
