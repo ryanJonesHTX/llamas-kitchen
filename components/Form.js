@@ -5,7 +5,7 @@ import { CheckCircleIcon } from '@heroicons/react/20/solid'
 
 let nextId = 0
 
-const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
+const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
   const router = useRouter()
   const contentType = 'application/json'
   const [errors, setErrors] = useState({})
@@ -430,7 +430,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true }) => {
                       type="text"
                       name="submittedBy"
                       id="submittedBy"
-                      placeholder="Bobby Flay"
+                      placeholder={chef}
                       value={form.submittedBy}
                       onChange={handleChange}
                       className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
