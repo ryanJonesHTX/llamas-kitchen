@@ -83,7 +83,7 @@ export default function Recipes({ recipes }) {
     }
 
     if (selectedTimeFilter) {
-      filteredAndSortedData = filteredData.filter((item) => {
+      filteredAndSortedData = filteredAndSortedData.filter((item) => {
         if (selectedTimeFilter === '<=80') {
           return item.cookTime + item.prepTime <= 80
         } else if (selectedTimeFilter === '>80') {
@@ -158,7 +158,10 @@ export default function Recipes({ recipes }) {
           aria-labelledby="filter-heading"
           className="grid items-center border-t border-b border-gray-200"
         >
-          <h2 id="filter-heading" className="sr-only">
+          <h2
+            id="filter-heading"
+            className="sr-only"
+          >
             Filters
           </h2>
           <div className="relative col-start-1 row-start-1 py-4">
@@ -243,7 +246,10 @@ export default function Recipes({ recipes }) {
           </Disclosure.Panel>
           <div className="col-start-1 row-start-1 py-4">
             <div className="mx-auto flex max-w-7xl justify-end px-4 sm:px-6 lg:px-8">
-              <Menu as="div" className="relative inline-block">
+              <Menu
+                as="div"
+                className="relative inline-block"
+              >
                 <div className="flex">
                   <Menu.Button className="group inline-flex justify-center text-sm font-medium text-gray-700 hover:text-gray-900">
                     Sort
@@ -296,7 +302,10 @@ export default function Recipes({ recipes }) {
           aria-labelledby="recipes-heading"
           className="mx-auto max-w-7xl overflow-hidden sm:px-6 lg:px-8"
         >
-          <h2 id="recipes-heading" className="sr-only">
+          <h2
+            id="recipes-heading"
+            className="sr-only"
+          >
             Recipes
           </h2>
 
@@ -312,13 +321,19 @@ export default function Recipes({ recipes }) {
                     alt={recipe.name}
                     className="h-full w-full object-cover object-center"
                     width={300}
-                  height={250}
+                    height={250}
                   />
                 </div>
                 <div className="pt-8 pb-4 text-center">
                   <h3 className="text-sm font-medium text-gray-900">
-                    <Link href="/[id]" as={`/${recipe._id}`}>
-                      <span aria-hidden="true" className="absolute inset-0" />
+                    <Link
+                      href="/[id]"
+                      as={`/${recipe._id}`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-0"
+                      />
                       {recipe.name}
                     </Link>
                   </h3>
