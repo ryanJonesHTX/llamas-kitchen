@@ -59,7 +59,6 @@ export default function Recipes({ recipes }) {
         option.current = false
       }
     })
-    console.log(value)
 
     setSortOption(value)
   }
@@ -71,10 +70,6 @@ export default function Recipes({ recipes }) {
     sortOption
   ) {
     let filteredAndSortedData = filteredData
-
-    if (filteredData.length > 0) {
-      filteredAndSortedData = filteredData
-    }
 
     if (selectedCategories.length > 0) {
       filteredAndSortedData = filteredAndSortedData.filter((recipe) =>

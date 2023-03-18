@@ -1,10 +1,12 @@
 import Link from 'next/link'
-import Image from 'next/image';
+import Image from 'next/image'
 
 export default function Recipecard({ recipes }) {
-  const latestRecipes = recipes.sort((a, b) => {
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  }).slice(0,4)
+  const latestRecipes = recipes
+    .sort((a, b) => {
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+    .slice(0, 4)
   return (
     <div className="bg-white">
       <div className="mx-auto max-w-2xl py-16 px-4 sm:py-24 sm:px-6 lg:max-w-7xl lg:px-8">
@@ -23,7 +25,10 @@ export default function Recipecard({ recipes }) {
 
         <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 md:grid-cols-4 md:gap-y-0 lg:gap-x-8">
           {latestRecipes.map((recipe) => (
-            <div key={recipe._id} className="group relative">
+            <div
+              key={recipe._id}
+              className="group relative"
+            >
               <div className="h-56 w-full overflow-hidden rounded-md bg-gray-200 group-hover:opacity-75 lg:h-72 xl:h-80">
                 <Image
                   src={recipe.photo}
@@ -34,7 +39,10 @@ export default function Recipecard({ recipes }) {
                 />
               </div>
               <h3 className="mt-4 text-sm text-gray-700">
-              <Link href="/[id]" as={`/${recipe._id}`}>
+                <Link
+                  href="/[id]"
+                  as={`/${recipe._id}`}
+                >
                   <span className="absolute inset-0" />
                   {recipe.name}
                 </Link>
@@ -44,13 +52,13 @@ export default function Recipecard({ recipes }) {
         </div>
 
         <div className="mt-8 text-sm md:hidden">
-          <a
-            href="#"
+          <Link
+            href="/recipes"
             className="font-medium text-indigo-600 hover:text-indigo-500"
           >
             See all Recipes
             <span aria-hidden="true"> &rarr;</span>
-          </a>
+          </Link>
         </div>
       </div>
     </div>
