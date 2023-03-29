@@ -23,7 +23,10 @@ export default function Nav({ recipes }) {
             className="flex items-center justify-between sm:h-10 lg:justify-start"
             aria-label="Global"
           >
-            <Link href="/" className="-m-1.5 p-1.5">
+            <Link
+              href="/"
+              className="-m-1.5 p-1.5"
+            >
               <span className="sr-only">Llama's Kitchen</span>
               <Image
                 alt="Llama's Kitchen"
@@ -33,13 +36,19 @@ export default function Nav({ recipes }) {
                 height={48}
               />
             </Link>
+            <h3 className="-ml-3 text-xl font-bold leading-6 text-gray-900 lg:hidden">
+              Llama's Kitchen
+            </h3>
             <button
               type="button"
               className="-m-2.5 rounded-md p-2.5 text-gray-700 lg:hidden"
               onClick={() => setMobileMenuOpen(true)}
             >
               <span className="sr-only">Open main menu</span>
-              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+              <Bars3Icon
+                className="h-6 w-6"
+                aria-hidden="true"
+              />
             </button>
             <div className="hidden lg:ml-12 lg:block lg:space-x-14">
               {navigation.map((item) => (
@@ -76,7 +85,11 @@ export default function Nav({ recipes }) {
               </div> */}
             </div>
           </nav>
-          <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
+          <Dialog
+            as="div"
+            open={mobileMenuOpen}
+            onClose={setMobileMenuOpen}
+          >
             <Dialog.Panel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
               <div className="flex flex-row-reverse items-center justify-between">
                 <button
@@ -85,9 +98,15 @@ export default function Nav({ recipes }) {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <span className="sr-only">Close menu</span>
-                  <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+                  <XMarkIcon
+                    className="h-6 w-6"
+                    aria-hidden="true"
+                  />
                 </button>
-                <Link href="/" className="-m-1.5 p-1.5">
+                <Link
+                  href="/"
+                  className="-m-1.5 p-1.5"
+                >
                   <span className="sr-only">Llama's Kitchen</span>
                   <Image
                     className="h-12"
@@ -109,7 +128,7 @@ export default function Nav({ recipes }) {
                   </Link>
                 ))}
                 <div className="flex flex-1 px-2 lg:hidden">
-                        <MyCombobox recipes={recipes} />
+                  <MyCombobox recipes={recipes} />
                   {/* <div className="w-full max-w-lg lg:max-w-xs">
                     <label htmlFor="search" className="sr-only">
                       Search
