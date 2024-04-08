@@ -14,7 +14,7 @@ const EditRecipe = () => {
     data: recipe,
     error,
     isLoading,
-  } = useSWR(id ? `/api/recies/${id}` : null, fetcher)
+  } = useSWR(id ? `/api/recipes/${id}` : null, fetcher)
 
   if (error) return <p>Failed to load</p>
   if (isLoading) return <p>Loading...</p>
@@ -34,7 +34,13 @@ const EditRecipe = () => {
     notes: recipe.notes,
   }
 
-  return <Form formId="edit-recipe-form" recipeForm={recipeForm} forNewRecipe={false} />
+  return (
+    <Form
+      formId="edit-recipe-form"
+      recipeForm={recipeForm}
+      forNewRecipe={false}
+    />
+  )
 }
 
 export default EditRecipe
