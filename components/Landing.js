@@ -81,7 +81,7 @@ export default function Landing({ recipes }) {
                     </div>
                     <input
                       id="search"
-                      className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
+                      className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-hidden focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
                       placeholder="Search"
                       type="search"
                       name="search"
@@ -143,7 +143,7 @@ export default function Landing({ recipes }) {
                         </div>
                         <input
                           id="search"
-                          className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
+                          className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-hidden focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
                           placeholder="Search"
                           type="search"
                           name="search"
@@ -168,7 +168,7 @@ export default function Landing({ recipes }) {
               <div className="mt-10 flex items-center gap-x-6">
                 <Link
                   href="/recipes"
-                  className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-base font-semibold leading-7 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-base font-semibold leading-7 text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 >
                   All Recipes
                 </Link>
@@ -187,7 +187,7 @@ export default function Landing({ recipes }) {
       </div>
       <div className="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
         <img
-          className="aspect-[4/3] object-cover lg:aspect-auto lg:h-full lg:w-full"
+          className="aspect-4/3 object-cover lg:aspect-auto lg:h-full lg:w-full"
           src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676182454/llama_rmoylj.webp"
           alt="Llama's Kitchen"
         />

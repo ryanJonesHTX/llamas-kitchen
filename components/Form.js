@@ -185,7 +185,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
     <div className="overflow-hidden bg-white py-16 px-6 lg:px-8 lg:py-24">
       <div className="relative mx-auto max-w-4xl">
         <form
-          className="space-y-8 divide-y divide-gray-200"
+          className="space-y-8"
           id={formId}
           onSubmit={handleSubmit}
         >
@@ -215,7 +215,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       id="name"
                       value={form.name}
                       onChange={handleChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -233,7 +233,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       value={form.description}
                       onChange={handleChange}
                       rows={3}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
@@ -255,14 +255,14 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       id="ingredients"
                       value={ingredient}
                       onChange={handleIngChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleAdd}
-                  className="rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  className="rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
                   Add
                 </button>
@@ -312,7 +312,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       value={form.directions}
                       onChange={handleChange}
                       rows={3}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -331,7 +331,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       id="prepTime"
                       value={form.prepTime}
                       onChange={handleChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -349,7 +349,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       id="cookTime"
                       value={form.cookTime}
                       onChange={handleChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -367,7 +367,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       name="category"
                       value={form.category}
                       onChange={handleChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     >
                       <option>Select a Category</option>
                       <option>Chicken</option>
@@ -397,7 +397,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                         <div className="flex text-sm text-gray-600">
                           <label
                             htmlFor="file-upload"
-                            className="relative cursor-pointer rounded-md bg-white font-medium text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 hover:text-indigo-500"
+                            className="relative cursor-pointer rounded-md bg-white font-medium text-indigo-600 focus-within:outline-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 hover:text-indigo-500"
                           >
                             <span>Upload an image</span>
                             <input
@@ -428,7 +428,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                 ) : (
                   <div className="sm:col-span-6 rounded-md bg-green-50 p-4">
                     <div className="flex">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <CheckCircleIcon
                           className="h-5 w-5 text-green-400"
                           aria-hidden="true"
@@ -460,7 +460,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       value={form.notes}
                       onChange={handleChange}
                       rows={3}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -480,7 +480,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                       placeholder={chef}
                       value={form.submittedBy}
                       onChange={handleChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -488,11 +488,11 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
             </div>
           </div>
 
-          <div className="pt-5">
+          <div className="border-t border-gray-200 pt-5">
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
                 Submit
               </button>

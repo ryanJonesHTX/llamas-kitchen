@@ -11,13 +11,6 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // CommonJS config files must use require().
-    files: ['*.config.js'],
-    rules: {
-      '@typescript-eslint/no-require-imports': 'off',
-    },
-  },
-  {
     // Tests read loosely shaped documents and fake responses.
     files: ['tests/**'],
     rules: {
