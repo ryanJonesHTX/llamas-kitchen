@@ -4,6 +4,7 @@ import { useState } from 'react'
 import MyCombobox from './MyCombobox'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import AuthControl from './AuthControl'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -84,6 +85,9 @@ export default function Landing({ recipes }) {
                 </div> */}
                 <MyCombobox recipes={recipes} />
               </div>
+              <div className="hidden lg:flex lg:items-center lg:ml-6">
+                <AuthControl />
+              </div>
             </nav>
             <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
               <Dialog.Panel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
@@ -117,6 +121,7 @@ export default function Landing({ recipes }) {
                       {item.name}
                     </Link>
                   ))}
+                  <AuthControl mobile />
                   <div className="flex flex-1 justify-center px-2 lg:ml-6 lg:justify-end">
                   <MyCombobox recipes={recipes} />
                     {/* <div className="w-full max-w-lg lg:max-w-xs">

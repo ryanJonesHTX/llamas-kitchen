@@ -22,10 +22,25 @@ const mongo = await MongoMemoryServer.create({
 await reseed()
 await disconnect()
 
+// Fake auth values: tests sign in by seeding sessions (tests/e2e/auth.ts) and
+// never reach GitHub or Resend. Plain http keeps the cookie unprefixed
+// (authjs.session-token).
+const e2eEnv = {
+  MONGODB_URI: E2E_MONGODB_URI,
+  AUTH_SECRET: 'e2e-test-secret-not-for-production',
+  AUTH_URL: `http://127.0.0.1:${APP_PORT}`,
+  AUTH_TRUST_HOST: 'true',
+  AUTH_GITHUB_ID: 'e2e-fake-github-id',
+  AUTH_GITHUB_SECRET: 'e2e-fake-github-secret',
+  AUTH_RESEND_KEY: 'e2e-fake-resend-key',
+  EMAIL_FROM: 'e2e@example.com',
+  ADMIN_EMAILS: '',
+}
+
 const next = spawn(
   'node_modules/.bin/next',
   ['start', '-p', APP_PORT, '-H', '127.0.0.1'],
-  { env: { ...process.env, MONGODB_URI: E2E_MONGODB_URI }, stdio: 'inherit' }
+  { env: { ...process.env, ...e2eEnv }, stdio: 'inherit' }
 )
 
 let stopping = false

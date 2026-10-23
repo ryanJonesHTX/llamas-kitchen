@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import AuthControl from './AuthControl'
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid'
 import MyCombobox from './MyCombobox'
 
@@ -84,6 +85,9 @@ export default function Nav({ recipes }) {
                 </div>
               </div> */}
             </div>
+            <div className="hidden lg:flex lg:items-center lg:mr-8">
+              <AuthControl />
+            </div>
           </nav>
           <Dialog
             as="div"
@@ -127,6 +131,7 @@ export default function Nav({ recipes }) {
                     {item.name}
                   </Link>
                 ))}
+                <AuthControl mobile />
                 <div className="flex flex-1 px-2 lg:hidden">
                   <MyCombobox recipes={recipes} />
                   {/* <div className="w-full max-w-lg lg:max-w-xs">

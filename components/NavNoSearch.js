@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import AuthControl from './AuthControl'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -50,6 +51,9 @@ export default function NavNoSearch({ recipes }) {
                 </Link>
               ))}
             </div>
+            <div className="hidden lg:flex lg:items-center lg:mr-8 lg:ml-auto">
+              <AuthControl />
+            </div>
           </nav>
           <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
             <Dialog.Panel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
@@ -83,6 +87,7 @@ export default function NavNoSearch({ recipes }) {
                     {item.name}
                   </Link>
                 ))}
+                <AuthControl mobile />
               </div>
             </Dialog.Panel>
           </Dialog>
