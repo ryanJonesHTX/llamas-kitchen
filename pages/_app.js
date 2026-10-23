@@ -1,6 +1,7 @@
 import Head from 'next/head'
 import '../styles/globals.css'
 import { useRouter } from 'next/router'
+import { SessionProvider } from 'next-auth/react'
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter()
@@ -26,9 +27,9 @@ function MyApp({ Component, pageProps }) {
           href="/images/favicon-16x16.png"
         /> */}
       </Head>
-        <>
+        <SessionProvider>
           <Component {...pageProps} />
-        </>
+        </SessionProvider>
     </>
   )
 }

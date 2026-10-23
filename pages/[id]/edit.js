@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Form from '../../components/Form'
+import { requireAdminPage } from '../../lib/requireAdmin'
 
 const fetcher = (url) =>
   fetch(url)
@@ -44,3 +45,5 @@ const EditRecipe = () => {
 }
 
 export default EditRecipe
+
+export const getServerSideProps = requireAdminPage
