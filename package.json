@@ -7,7 +7,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate:recipes-v2": "node scripts/migrate-recipes-v2/index.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "3.11.3",

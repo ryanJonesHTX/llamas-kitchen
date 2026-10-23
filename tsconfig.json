@@ -32,6 +32,7 @@
     "instrumentation.ts",
     "app/**/*.ts",
     "lib/**/*.ts",
+    "scripts/**/*.ts",
     "types/**/*.d.ts",
     "tests/**/*.ts",
     "vitest.config.ts",
