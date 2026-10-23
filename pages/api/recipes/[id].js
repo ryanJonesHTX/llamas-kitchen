@@ -1,7 +1,8 @@
+import mongoose from 'mongoose'
+import { z } from 'zod'
 import dbConnect from '../../../lib/dbConnect'
+import { recipeInputSchema } from '../../../lib/recipeSchema'
 import Recipe from '../../../models/Recipe'
-
-// const results = await Data.find({ name: { $regex: searchTerm, $options: 'i' } });
 
 export default async function handler(req, res) {
   const {
@@ -9,50 +10,49 @@ export default async function handler(req, res) {
     method,
   } = req
 
+  if (!['GET', 'PUT', 'DELETE'].includes(method)) {
+    res.setHeader('Allow', 'GET, PUT, DELETE')
+    return res.status(405).json({ success: false })
+  }
+
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(404).json({ success: false })
+  }
+
   await dbConnect()
 
   switch (method) {
-    case 'GET' /* Get a model by its ID */:
-      try {
-        const recipe = await Recipe.findById(id)
-        if (!recipe) {
-          return res.status(400).json({ success: false })
-        }
-        res.status(200).json({ success: true, data: recipe })
-      } catch (error) {
-        res.status(400).json({ success: false })
+    case 'GET' /* Get a model by its ID */: {
+      const recipe = await Recipe.findById(id)
+      if (!recipe) {
+        return res.status(404).json({ success: false })
       }
-      break
+      return res.status(200).json({ success: true, data: recipe })
+    }
 
-    case 'PUT' /* Edit a model by its ID */:
-      try {
-        const recipe = await Recipe.findByIdAndUpdate(id, req.body, {
-          new: true,
-          runValidators: true,
-        })
-        if (!recipe) {
-          return res.status(400).json({ success: false })
-        }
-        res.status(200).json({ success: true, data: recipe })
-      } catch (error) {
-        res.status(400).json({ success: false })
+    case 'PUT' /* Replace the editable fields of a model by its ID */: {
+      const recipe = await Recipe.findById(id)
+      if (!recipe) {
+        return res.status(404).json({ success: false })
       }
-      break
-
-    case 'DELETE' /* Delete a model by its ID */:
-      try {
-        const deletedRecipe = await Recipe.deleteOne({ _id: id })
-        if (!deletedRecipe) {
-          return res.status(400).json({ success: false })
-        }
-        res.status(200).json({ success: true, data: {} })
-      } catch (error) {
-        res.status(400).json({ success: false })
+      const parsed = recipeInputSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return res
+          .status(422)
+          .json({ success: false, errors: z.flattenError(parsed.error).fieldErrors })
       }
-      break
+      // overwrite() keeps _id and the immutable createdAt; save() bumps updatedAt.
+      recipe.overwrite(parsed.data)
+      await recipe.save()
+      return res.status(200).json({ success: true, data: recipe })
+    }
 
-    default:
-      res.status(400).json({ success: false })
-      break
+    case 'DELETE' /* Delete a model by its ID */: {
+      const { deletedCount } = await Recipe.deleteOne({ _id: id })
+      if (deletedCount === 0) {
+        return res.status(404).json({ success: false })
+      }
+      return res.status(200).json({ success: true, data: {} })
+    }
   }
 }

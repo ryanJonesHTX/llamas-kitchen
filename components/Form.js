@@ -3,14 +3,12 @@ import { useRouter } from 'next/router'
 import { mutate } from 'swr'
 import { CheckCircleIcon } from '@heroicons/react/20/solid'
 
-let nextId = 0
-
 const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
   const router = useRouter()
   const contentType = 'application/json'
   const [errors, setErrors] = useState({})
   const [message, setMessage] = useState('')
-  const [ingredients, setIngredients] = useState([])
+  const [ingredients, setIngredients] = useState(recipeForm.ingredients)
   const [ingredient, setIngredient] = useState('')
   const [uploaded, setUploaded] = useState(false)
 
@@ -18,7 +16,6 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
     name: recipeForm.name,
     description: recipeForm.description,
     directions: recipeForm.directions,
-    ingredients: ingredients,
     prepTime: recipeForm.prepTime,
     cookTime: recipeForm.cookTime,
     photo: recipeForm.photo,
@@ -96,7 +93,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
     if (!form.name) err.name = 'A recipe has no name?'
     if (!form.description)
       err.description = 'Please provide a brief description of the recipe'
-    if (!form.ingredients)
+    if (ingredients.length === 0)
       err.ingredients = "There's gotta be at least one ingredient! Right?"
     return err
   }
@@ -104,7 +101,8 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
     e.preventDefault()
     const errs = formValidate()
     if (Object.keys(errs).length === 0) {
-      forNewRecipe ? postData(form) : putData(form)
+      const recipe = { ...form, ingredients }
+      forNewRecipe ? postData(recipe) : putData(recipe)
     } else {
       setErrors({ errs })
     }
@@ -116,10 +114,13 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
 
   const handleAdd = () => {
     setIngredient('')
-    ingredients.push({
-      id: nextId++,
-      ingredient: ingredient,
-    })
+    setIngredients([
+      ...ingredients,
+      {
+        id: Math.max(-1, ...ingredients.map((i) => i.id)) + 1,
+        ingredient: ingredient,
+      },
+    ])
   }
 
   // File uploader
