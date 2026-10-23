@@ -12,3 +12,6 @@ export function slugify(name: string): string {
   if (!slug) throw new Error(`slugify: nothing to slug in ${JSON.stringify(name)}`)
   return slug
 }
+
+// What slugify produces: lowercase a-z0-9 words joined by single hyphens.
+export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/

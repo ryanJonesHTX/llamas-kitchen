@@ -17,4 +17,6 @@ export const TIME_FILTERS = [
 
 export const RECIPE_PAGE_SIZE = 24
 
+export const MAX_RECIPE_NAME_LENGTH = 120
+
 export const MAX_RECIPE_TAGS = 10

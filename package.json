@@ -8,7 +8,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "migrate:recipes-v2": "node scripts/migrate-recipes-v2/index.ts"
+    "migrate:recipes-v2": "node scripts/migrate-recipes-v2/index.ts",
+    "create-indexes": "node scripts/create-indexes.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "3.11.3",
