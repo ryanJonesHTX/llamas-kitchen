@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # mongodb-memory-server downloads its MongoDB binary in its postinstall
+      # script, so this cache must be restored before `npm ci`.
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npm ci
+        env:
+          # The postinstall otherwise downloads into node_modules/.cache,
+          # which `npm ci` deletes; this sends it to ~/.cache/mongodb-binaries.
+          MONGOMS_PREFER_GLOBAL_PATH: 'true'
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build
+        env:
+          # lib/dbConnect.js throws at import time without MONGODB_URI, and
+          # `next build` imports it while collecting page data. Placeholder
+          # only: the build never connects to it.
+          MONGODB_URI: mongodb://127.0.0.1:1/ci-build-placeholder
+
+      - run: npx playwright install --with-deps chromium
+
+      # tests/e2e/server.ts sets its own MONGODB_URI (in-memory MongoDB).
+      - run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
