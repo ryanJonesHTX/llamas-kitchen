@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { signInAs } from './auth.ts'
 import { disconnect, reseed } from './db.ts'
 import { seedRecipes } from './fixtures.ts'
 
@@ -143,8 +144,10 @@ test('recipe page shows name, ingredients and directions', async ({ page }) => {
 })
 
 test('adding a recipe shows it on the home page and its own page', async ({
+  context,
   page,
 }) => {
+  await signInAs(context, { email: 'admin@example.com', role: 'admin' })
   const uploadedPhoto = 'https://res.cloudinary.com/demo/image/upload/sample.jpg'
   await page.route(
     'https://api.cloudinary.com/v1_1/*/image/upload/',

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import dbConnect from '../../../lib/dbConnect'
 import { recipeInputSchema } from '../../../lib/recipeSchema'
+import { requireAdmin } from '../../../lib/requireAdmin'
 import Recipe from '../../../models/Recipe'
 
 export default async function handler(req, res) {
@@ -10,6 +11,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST')
     return res.status(405).json({ success: false })
   }
+
+  if (method === 'POST' && !(await requireAdmin(req, res))) return
 
   await dbConnect()
 

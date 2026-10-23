@@ -1,6 +1,7 @@
 import Form from '../components/Form'
 import Head from 'next/head'
 import NavNosearch from '../components/NavNoSearch'
+import { requireAdminPage } from '../lib/requireAdmin'
 
 const NewRecipe = () => {
   const recipeForm = {
@@ -45,3 +46,5 @@ const NewRecipe = () => {
 }
 
 export default NewRecipe
+
+export const getServerSideProps = requireAdminPage

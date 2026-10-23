@@ -4,16 +4,21 @@ import { useState } from 'react'
 import MyCombobox from './MyCombobox'
 import { Dialog } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
+import { isAdmin } from '../lib/roles'
 
 const navigation = [
   { name: 'Home', href: '/' },
   { name: 'Recipes', href: '/recipes' },
-  { name: 'Add Recipe', href: '/new' },
+  { name: 'Add Recipe', href: '/new', adminOnly: true },
 ]
 
 export default function Landing({ recipes }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // Hidden while the session loads, so non-admins never see admin links.
+  const admin = isAdmin(useSession().data)
+  const links = navigation.filter((item) => admin || !item.adminOnly)
 
   return (
     <div className="relative bg-white">
@@ -52,7 +57,7 @@ export default function Landing({ recipes }) {
                 <Bars3Icon className="h-6 w-6" aria-hidden="true" />
               </button>
               <div className="hidden lg:ml-12 lg:block lg:space-x-14">
-                {navigation.map((item) => (
+                {links.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
@@ -112,7 +117,7 @@ export default function Landing({ recipes }) {
                   </Link>
                 </div>
                 <div className="mt-6 space-y-2">
-                  {navigation.map((item) => (
+                  {links.map((item) => (
                     <Link
                       key={item.name}
                       href={item.href}
@@ -166,12 +171,14 @@ export default function Landing({ recipes }) {
                 >
                   All Recipes
                 </Link>
-                <Link
-                  href="/new"
-                  className="text-base font-semibold leading-7 text-gray-900"
-                >
-                  Add Recipe <span aria-hidden="true">→</span>
-                </Link>
+                {admin && (
+                  <Link
+                    href="/new"
+                    className="text-base font-semibold leading-7 text-gray-900"
+                  >
+                    Add Recipe <span aria-hidden="true">→</span>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

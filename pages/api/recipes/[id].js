@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import { z } from 'zod'
 import dbConnect from '../../../lib/dbConnect'
 import { recipeInputSchema } from '../../../lib/recipeSchema'
+import { requireAdmin } from '../../../lib/requireAdmin'
 import Recipe from '../../../models/Recipe'
 
 export default async function handler(req, res) {
@@ -14,6 +15,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, PUT, DELETE')
     return res.status(405).json({ success: false })
   }
+
+  if (method !== 'GET' && !(await requireAdmin(req, res))) return
 
   if (!mongoose.isValidObjectId(id)) {
     return res.status(404).json({ success: false })

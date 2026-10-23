@@ -1,9 +1,22 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import mongoose from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 
 // Calls the Pages Router API handlers directly with minimal fake req/res
 // objects against an in-memory MongoDB on a random port.
+
+// The handlers read the session through the repo-root auth.ts, which pulls in
+// next-auth (not loadable under Vitest). Replace it at the module boundary
+// with a mock that resolves to whichever session each test picks.
+const { auth } = vi.hoisted(() => ({ auth: vi.fn() }))
+vi.mock('../../auth', () => ({ auth }))
+
+const sessionFor = (role: 'user' | 'admin') => ({
+  expires: '2999-01-01T00:00:00.000Z',
+  user: { id: `${role}-id`, name: role, email: `${role}@example.com`, image: null, role },
+})
+const adminSession = sessionFor('admin')
+const userSession = sessionFor('user')
 
 type Handler = (req: FakeRequest, res: FakeResponse) => Promise<unknown>
 
@@ -99,6 +112,9 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await Recipe.deleteMany({})
+  // Every test runs as an admin unless it picks another session.
+  auth.mockReset()
+  auth.mockResolvedValue(adminSession)
 })
 
 describe('/api/recipes', () => {
@@ -277,4 +293,92 @@ describe('/api/recipes/[id]', () => {
       expect(res.headers.allow).toBe('GET, PUT, DELETE')
     },
   )
+})
+
+describe('write guards', () => {
+  const noSession = { label: 'no session', session: null, status: 401 }
+  const userRole = { label: 'a user session', session: userSession, status: 403 }
+
+  for (const { label, session, status } of [noSession, userRole]) {
+    it(`POST /api/recipes with ${label} returns ${status} and saves nothing`, async () => {
+      auth.mockResolvedValue(session)
+      const res = await call(collectionHandler, { method: 'POST', body: validRecipe })
+      expect(res.statusCode).toBe(status)
+      expect(res.body).toEqual({ success: false })
+      expect(await Recipe.countDocuments()).toBe(0)
+    })
+
+    it(`PUT /api/recipes/[id] with ${label} returns ${status} and leaves the recipe unchanged`, async () => {
+      const id = await seedRecipe()
+      auth.mockResolvedValue(session)
+      const res = await call(itemHandler, {
+        method: 'PUT',
+        query: { id },
+        body: { ...validRecipe, name: 'Waffles' },
+      })
+      expect(res.statusCode).toBe(status)
+      expect(res.body).toEqual({ success: false })
+      const saved = await Recipe.findById(id).lean<any>()
+      expect(saved.name).toBe('Pancakes')
+    })
+
+    it(`DELETE /api/recipes/[id] with ${label} returns ${status} and keeps the recipe`, async () => {
+      const id = await seedRecipe()
+      auth.mockResolvedValue(session)
+      const res = await call(itemHandler, { method: 'DELETE', query: { id } })
+      expect(res.statusCode).toBe(status)
+      expect(res.body).toEqual({ success: false })
+      expect(await Recipe.findById(id)).not.toBeNull()
+    })
+
+    it.each(['PUT', 'DELETE'])(
+      `%s with ${label} returns ${status} before checking the id`,
+      async (method) => {
+        auth.mockResolvedValue(session)
+        const res = await call(itemHandler, { method, query: { id: 'not-an-id' }, body: validRecipe })
+        expect(res.statusCode).toBe(status)
+      },
+    )
+
+    it(`POST /api/recipes with ${label} returns ${status} before validating the body`, async () => {
+      auth.mockResolvedValue(session)
+      const res = await call(collectionHandler, { method: 'POST', body: {} })
+      expect(res.statusCode).toBe(status)
+    })
+  }
+
+  it('GET /api/recipes with no session returns 200', async () => {
+    await seedRecipe()
+    auth.mockResolvedValue(null)
+    const res = await call(collectionHandler, { method: 'GET' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body.data).toHaveLength(1)
+  })
+
+  it('GET /api/recipes/[id] with no session returns 200', async () => {
+    const id = await seedRecipe()
+    auth.mockResolvedValue(null)
+    const res = await call(itemHandler, { method: 'GET', query: { id } })
+    expect(res.statusCode).toBe(200)
+    expect(res.body.data).toMatchObject({ _id: id, name: 'Pancakes' })
+  })
+
+  for (const session of [null, userSession, adminSession]) {
+    const label = session ? `a ${session.user.role} session` : 'no session'
+
+    it(`unknown methods return 405 on /api/recipes with ${label}`, async () => {
+      auth.mockResolvedValue(session)
+      const res = await call(collectionHandler, { method: 'PATCH', body: validRecipe })
+      expect(res.statusCode).toBe(405)
+      expect(res.headers.allow).toBe('GET, POST')
+    })
+
+    it(`unknown methods return 405 on /api/recipes/[id] with ${label}`, async () => {
+      const id = await seedRecipe()
+      auth.mockResolvedValue(session)
+      const res = await call(itemHandler, { method: 'PATCH', query: { id }, body: validRecipe })
+      expect(res.statusCode).toBe(405)
+      expect(res.headers.allow).toBe('GET, PUT, DELETE')
+    })
+  }
 })
