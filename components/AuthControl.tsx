@@ -1,3 +1,5 @@
+'use client'
+
 import { signIn, signOut, useSession } from 'next-auth/react'
 
 const styles = {
@@ -18,7 +20,7 @@ const styles = {
 
 // Sign in when signed out; the user's name (or email) and Sign out when
 // signed in. Renders nothing while the session loads.
-export default function AuthControl({ mobile = false }) {
+export default function AuthControl({ mobile = false }: { mobile?: boolean }) {
   const { data: session, status } = useSession()
   const style = mobile ? styles.mobile : styles.desktop
 

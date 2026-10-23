@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState } from 'react'
@@ -5,17 +7,28 @@ import { Dialog, DialogPanel } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
+import RecipeSearch from './RecipeSearch'
 import { isAdmin } from '../lib/roles'
 import { NAV_LINKS } from '../lib/constants'
+import type { SearchOption } from '../lib/searchOptions'
 
-export default function NavNoSearch({ recipes }) {
+const logo =
+  'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp'
+
+export default function SiteHeader({
+  searchOptions,
+}: {
+  searchOptions: SearchOption[]
+}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   // Hidden while the session loads, so non-admins never see admin links.
   const admin = isAdmin(useSession().data)
-  const links = NAV_LINKS.filter((item) => admin || !item.adminOnly)
+  const links = NAV_LINKS.filter(
+    (item) => admin || !('adminOnly' in item && item.adminOnly)
+  )
 
   return (
-    <div className="relative px-6 pt-6 lg:pl-8 lg:pr-0">
+    <header className="relative px-6 pt-6 lg:pl-8 lg:pr-0">
       <div className="mx-auto max-w-7xl">
         <div className="lg:w-full">
           <nav
@@ -27,11 +40,14 @@ export default function NavNoSearch({ recipes }) {
               <Image
                 alt="Llama's Kitchen"
                 className="h-12 w-auto"
-                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
+                src={logo}
                 width={48}
                 height={48}
               />
             </Link>
+            <h3 className="-ml-3 text-xl font-bold leading-6 text-gray-900 lg:hidden">
+              Llama's Kitchen
+            </h3>
             <button
               type="button"
               className="-m-2.5 rounded-md p-2.5 text-gray-700 lg:hidden"
@@ -51,11 +67,19 @@ export default function NavNoSearch({ recipes }) {
                 </Link>
               ))}
             </div>
-            <div className="hidden lg:flex lg:items-center lg:mr-8 lg:ml-auto">
+            <div className="hidden lg:flex lg:mr-8 lg:ml-auto">
+              <RecipeSearch options={searchOptions} />
+            </div>
+            <div className="hidden lg:flex lg:items-center lg:mr-8">
               <AuthControl />
             </div>
           </nav>
-          <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
+          <Dialog
+            as="div"
+            open={mobileMenuOpen}
+            onClose={setMobileMenuOpen}
+            aria-label="Main menu"
+          >
             <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
               <div className="flex flex-row-reverse items-center justify-between">
                 <button
@@ -70,12 +94,12 @@ export default function NavNoSearch({ recipes }) {
                 <Link href="/" className="-m-1.5 p-1.5">
                   <span className="sr-only">Llama's Kitchen</span>
                   <Image
-                alt="Llama's Kitchen"
-                className="h-12 w-auto"
-                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                width={48}
-                height={48}
-              />
+                    className="h-12"
+                    src={logo}
+                    alt="Llama's Kitchen"
+                    width={42}
+                    height={42}
+                  />
                 </Link>
               </div>
               <div className="mt-6 space-y-2">
@@ -89,11 +113,14 @@ export default function NavNoSearch({ recipes }) {
                   </Link>
                 ))}
                 <AuthControl mobile />
+                <div className="flex flex-1 px-2 lg:hidden">
+                  <RecipeSearch options={searchOptions} />
+                </div>
               </div>
             </DialogPanel>
           </Dialog>
         </div>
       </div>
-    </div>
+    </header>
   )
 }

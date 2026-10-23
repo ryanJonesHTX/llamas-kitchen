@@ -1,24 +1,11 @@
 import Link from 'next/link'
-import Image from 'next/image'
-import { useState } from 'react'
-import MyCombobox from './MyCombobox'
-import { Dialog, DialogPanel } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
-import AuthControl from './AuthControl'
+import SiteHeader from './SiteHeader'
 import { isAdmin } from '../lib/roles'
 
-const navigation = [
-  { name: 'Home', href: '/' },
-  { name: 'Recipes', href: '/recipes' },
-  { name: 'Add Recipe', href: '/new', adminOnly: true },
-]
-
-export default function Landing({ recipes }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+export default function Landing({ searchOptions }) {
   // Hidden while the session loads, so non-admins never see admin links.
   const admin = isAdmin(useSession().data)
-  const links = navigation.filter((item) => admin || !item.adminOnly)
 
   return (
     <div className="relative bg-white">
@@ -33,128 +20,7 @@ export default function Landing({ recipes }) {
             <polygon points="0,0 90,0 50,100 0,100" />
           </svg>
 
-          <div className="relative px-6 pt-6 lg:pl-8 lg:pr-0">
-            <nav
-              className="flex items-center justify-between sm:h-10 lg:justify-start"
-              aria-label="Global"
-            >
-              <Link href="/" className="-m-1.5 p-1.5">
-                <span className="sr-only">Llama's Kitchen</span>
-                <Image
-                alt="Llama's Kitchen"
-                className="h-12 w-auto"
-                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                width={48}
-                height={48}
-              />
-              </Link>
-              <button
-                type="button"
-                className="-m-2.5 rounded-md p-2.5 text-gray-700 lg:hidden"
-                onClick={() => setMobileMenuOpen(true)}
-              >
-                <span className="sr-only">Open main menu</span>
-                <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-              </button>
-              <div className="hidden lg:ml-12 lg:block lg:space-x-14">
-                {links.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className="text-sm font-semibold leading-6 text-gray-900"
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-              <div className="hidden lg:flex lg:flex-1 justify-center px-2 lg:ml-12 lg:justify-end">
-                {/* <div className="w-full max-w-lg lg:max-w-xs">
-                  <label htmlFor="search" className="sr-only">
-                    Search
-                  </label>
-                  <div className="relative text-gray-400 focus-within:text-gray-600">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <MagnifyingGlassIcon
-                        className="h-5 w-5"
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <input
-                      id="search"
-                      className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-hidden focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
-                      placeholder="Search"
-                      type="search"
-                      name="search"
-                    />
-                  </div>
-                </div> */}
-                <MyCombobox recipes={recipes} />
-              </div>
-              <div className="hidden lg:flex lg:items-center lg:ml-6">
-                <AuthControl />
-              </div>
-            </nav>
-            <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
-              <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
-                <div className="flex flex-row-reverse items-center justify-between">
-                  <button
-                    type="button"
-                    data-autofocus
-                    className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <span className="sr-only">Close menu</span>
-                    <XMarkIcon className="h-6 w-6" aria-hidden="true" />
-                  </button>
-                  <Link href="/" className="-m-1.5 p-1.5">
-                    <span className="sr-only">Llama's Kitchen</span>
-                    <Image
-                alt="Llama's Kitchen"
-                className="h-12"
-                src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp"
-                width={48}
-                height={48}
-              />
-                  </Link>
-                </div>
-                <div className="mt-6 space-y-2">
-                  {links.map((item) => (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-400/10"
-                    >
-                      {item.name}
-                    </Link>
-                  ))}
-                  <AuthControl mobile />
-                  <div className="flex flex-1 justify-center px-2 lg:ml-6 lg:justify-end">
-                  <MyCombobox recipes={recipes} />
-                    {/* <div className="w-full max-w-lg lg:max-w-xs">
-                      <label htmlFor="search" className="sr-only">
-                        Search
-                      </label>
-                      <div className="relative text-gray-400 focus-within:text-gray-600">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                          <MagnifyingGlassIcon
-                            className="h-5 w-5"
-                            aria-hidden="true"
-                          />
-                        </div>
-                        <input
-                          id="search"
-                          className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-hidden focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
-                          placeholder="Search"
-                          type="search"
-                          name="search"
-                        />
-                      </div>
-                    </div> */}
-                  </div>
-                </div>
-              </DialogPanel>
-            </Dialog>
-          </div>
+          <SiteHeader searchOptions={searchOptions} />
 
           <div className="relative py-32 px-6 sm:py-40 lg:py-56 lg:px-8 lg:pr-0">
             <div className="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">

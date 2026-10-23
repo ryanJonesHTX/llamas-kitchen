@@ -5,10 +5,11 @@ import Image from 'next/image'
 import mongoose from 'mongoose'
 import dbConnect from '../../lib/dbConnect'
 import Recipe from '../../models/Recipe'
-import NavNosearch from '../../components/NavNoSearch'
+import { publishedSearchOptions } from '../../lib/searchOptions'
+import SiteHeader from '../../components/SiteHeader'
 
 /* Allows you to view pet card info and delete pet card*/
-const RecipePage = ({ recipe }) => {
+const RecipePage = ({ recipe, searchOptions }) => {
   const router = useRouter()
   const [message, setMessage] = useState('')
   // const handleDelete = async () => {
@@ -26,7 +27,7 @@ const RecipePage = ({ recipe }) => {
 
   return (
     <div className="bg-white">
-      <NavNosearch />
+      <SiteHeader searchOptions={searchOptions} />
       <main className="mx-auto mt-8 max-w-2xl px-4 sm:px-6 pb-20 lg:max-w-4xl lg:px-8">
         <div className="mx-auto">
           <h1 className="text-xl font-medium text-gray-900">{recipe.name}</h1>
@@ -150,7 +151,9 @@ export async function getServerSideProps({ params }) {
   recipe._id = recipe._id.toString()
   recipe = JSON.parse(JSON.stringify(recipe))
 
-  return { props: { recipe } }
+  const searchOptions = await publishedSearchOptions()
+
+  return { props: { recipe, searchOptions } }
 }
 
 export default RecipePage

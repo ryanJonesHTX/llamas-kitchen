@@ -1,14 +1,24 @@
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Form from '../../components/Form'
+import SiteHeader from '../../components/SiteHeader'
 import { requireAdminPage } from '../../lib/requireAdmin'
+import { publishedSearchOptions } from '../../lib/searchOptions'
 
 const fetcher = (url) =>
   fetch(url)
     .then((res) => res.json())
     .then((json) => json.data)
 
-const EditRecipe = () => {
+const EditRecipe = ({ searchOptions }) => (
+  <>
+    <SiteHeader searchOptions={searchOptions} />
+    <EditRecipeBody />
+  </>
+)
+
+// The header stays up while the recipe loads or fails to load.
+const EditRecipeBody = () => {
   const router = useRouter()
   const { id } = router.query
   const {
@@ -46,4 +56,9 @@ const EditRecipe = () => {
 
 export default EditRecipe
 
-export const getServerSideProps = requireAdminPage
+export async function getServerSideProps(context) {
+  const guard = await requireAdminPage(context)
+  if (!('props' in guard)) return guard
+
+  return { props: { searchOptions: await publishedSearchOptions() } }
+}

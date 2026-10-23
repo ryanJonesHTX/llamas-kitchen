@@ -3,14 +3,15 @@ import Recipe from '../models/Recipe'
 import Head from 'next/head'
 import LatestRecipes from '../components/LatestRecipes'
 import Landing from '../components/Landing'
+import { publishedSearchOptions } from '../lib/searchOptions'
 
-const Index = ({ recipes }) => {
+const Index = ({ recipes, searchOptions }) => {
   return (
     <>
       <Head>
         <title>Llamas Kitchen</title>
       </Head>
-      <Landing recipes={recipes}/>
+      <Landing searchOptions={searchOptions} />
       <LatestRecipes recipes={recipes} />
     </>
   )
@@ -29,7 +30,9 @@ export async function getServerSideProps() {
       return JSON.parse(JSON.stringify(recipe))
     })
 
-    return { props: { recipes: recipes } }
+    const searchOptions = await publishedSearchOptions()
+
+    return { props: { recipes: recipes, searchOptions } }
   } catch (e) {
     console.error(e)
     return { props: {} }

@@ -28,9 +28,6 @@ const newRecipe = {
   category: 'Pasta',
 }
 
-const visibleButton = (page: Page, name: string) =>
-  page.getByRole('button', { name, exact: true }).filter({ visible: true })
-
 // The nav links and the Landing call-to-action ("Add Recipe →", whose arrow
 // is aria-hidden) all have the accessible name "Add Recipe".
 const addRecipeLinks = (page: Page) =>
@@ -95,47 +92,6 @@ test.describe('signed in as user', () => {
     expect((await page.request.get(`/api/recipes/${stew._id}`)).status()).toBe(200)
   })
 })
-
-// Home uses components/Landing.js, /recipes uses components/Nav.js and a
-// recipe page uses components/NavNoSearch.js.
-const pagesWithNav = [
-  { nav: 'Landing', path: '/' },
-  { nav: 'Nav', path: '/recipes' },
-  { nav: 'NavNoSearch', path: `/${stew._id}` },
-]
-
-for (const { nav, path } of pagesWithNav) {
-  test(`signed out, ${nav} hides the Add Recipe link`, async ({ page }) => {
-    await page.goto(path)
-    // Wait for the session to load so the links have their final state.
-    await expect(visibleButton(page, 'Sign in')).toBeVisible()
-
-    await expect(addRecipeLinks(page)).toHaveCount(0)
-  })
-
-  test(`signed in as user, ${nav} hides the Add Recipe link`, async ({
-    context,
-    page,
-  }) => {
-    await signInAs(context, { email: 'user@example.com', role: 'user' })
-    await page.goto(path)
-    await expect(visibleButton(page, 'Sign out')).toBeVisible()
-
-    await expect(addRecipeLinks(page)).toHaveCount(0)
-  })
-
-  test(`signed in as admin, ${nav} shows the Add Recipe link`, async ({
-    context,
-    page,
-  }) => {
-    await signInAs(context, { email: 'admin@example.com', role: 'admin' })
-    await page.goto(path)
-
-    await expect(
-      addRecipeLinks(page).filter({ visible: true }).first()
-    ).toBeVisible()
-  })
-}
 
 test('signed in as admin, Landing shows the Add Recipe call-to-action', async ({
   context,

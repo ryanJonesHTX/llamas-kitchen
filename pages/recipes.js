@@ -1,7 +1,8 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
 import { TIME_FILTERS } from '../lib/constants'
-import Nav from '../components/Nav'
+import { publishedSearchOptions } from '../lib/searchOptions'
+import SiteHeader from '../components/SiteHeader'
 import Link from 'next/link'
 import Head from 'next/head'
 import Image from 'next/image'
@@ -42,7 +43,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Recipes({ recipes }) {
+export default function Recipes({ recipes, searchOptions }) {
   const [open, setOpen] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState([])
   const [selectedTimeFilter, setSelectedTimeFilter] = useState(null)
@@ -145,7 +146,7 @@ export default function Recipes({ recipes }) {
       <Head>
         <title>Llamas Kitchen - Recipes</title>
       </Head>
-      <Nav recipes={recipes} />
+      <SiteHeader searchOptions={searchOptions} />
       <main className="pb-24">
         <div className="py-16 px-4 text-center sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">
@@ -427,7 +428,9 @@ export async function getServerSideProps() {
       return JSON.parse(JSON.stringify(recipe))
     })
 
-    return { props: { recipes: recipes } }
+    const searchOptions = await publishedSearchOptions()
+
+    return { props: { recipes: recipes, searchOptions } }
   } catch (e) {
     console.error(e)
     return { props: {} }

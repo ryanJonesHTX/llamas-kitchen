@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import Form from '../components/Form'
 import Head from 'next/head'
-import NavNosearch from '../components/NavNoSearch'
+import SiteHeader from '../components/SiteHeader'
 import { requireAdminPage } from '../lib/requireAdmin'
+import { publishedSearchOptions } from '../lib/searchOptions'
 
-const NewRecipe = () => {
+const NewRecipe = ({ searchOptions }) => {
   const recipeForm = {
     name: '',
     description: '',
@@ -36,7 +37,7 @@ const NewRecipe = () => {
       <Head>
         <title>Llamas Kitchen - Add Recipe</title>
       </Head>
-      <NavNosearch />
+      <SiteHeader searchOptions={searchOptions} />
       <Form
         formId="add-recipe-form"
         recipeForm={recipeForm}
@@ -48,4 +49,9 @@ const NewRecipe = () => {
 
 export default NewRecipe
 
-export const getServerSideProps = requireAdminPage
+export async function getServerSideProps(context) {
+  const guard = await requireAdminPage(context)
+  if (!('props' in guard)) return guard
+
+  return { props: { searchOptions: await publishedSearchOptions() } }
+}
