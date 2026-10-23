@@ -99,7 +99,7 @@ async function seedRecipe() {
 beforeAll(async () => {
   mongo = await MongoMemoryServer.create()
   process.env.MONGODB_URI = mongo.getUri('recipes-api-test')
-  await (await import('../../lib/dbConnect.js')).default()
+  await (await import('../../lib/dbConnect.ts')).default()
   collectionHandler = (await import('../../pages/api/recipes/index.js')).default
   itemHandler = (await import('../../pages/api/recipes/[id].js')).default
   Recipe = (await import('../../models/Recipe.js')).default

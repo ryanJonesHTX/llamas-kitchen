@@ -8,18 +8,30 @@ if (!MONGODB_URI) {
   )
 }
 
+// The check above doesn't narrow inside the hoisted dbConnect below.
+const uri: string = MONGODB_URI
+
+type MongooseCache = {
+  conn: typeof mongoose | null
+  promise: Promise<typeof mongoose> | null
+}
+
+const globalWithMongoose = globalThis as typeof globalThis & {
+  mongoose?: MongooseCache
+}
+
 /**
  * Cached on globalThis so dev hot reloads and concurrent requests share one
  * connection instead of opening a new one each time.
  */
-const cached = (globalThis.mongoose ??= { conn: null, promise: null })
+const cached = (globalWithMongoose.mongoose ??= { conn: null, promise: null })
 
-async function dbConnect() {
+async function dbConnect(): Promise<typeof mongoose> {
   if (cached.conn) {
     return cached.conn
   }
 
-  cached.promise ??= mongoose.connect(MONGODB_URI, { bufferCommands: false })
+  cached.promise ??= mongoose.connect(uri, { bufferCommands: false })
 
   try {
     cached.conn = await cached.promise

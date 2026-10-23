@@ -1,5 +1,6 @@
 import dbConnect from '../lib/dbConnect'
 import Recipe from '../models/Recipe'
+import { TIME_FILTERS } from '../lib/constants'
 import Nav from '../components/Nav'
 import Link from 'next/link'
 import Head from 'next/head'
@@ -18,10 +19,7 @@ import {
 import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
 
 const filters = {
-  time: [
-    { value: '<=80', label: 'Total Time: ~1 Hour' },
-    { value: '>80', label: 'Total Time: > 1 Hour' },
-  ],
+  time: TIME_FILTERS,
   category: [
     { value: 'Chicken', label: 'Chicken' },
     { value: 'Beef', label: 'Beef' },

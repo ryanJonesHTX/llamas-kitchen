@@ -6,18 +6,13 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
 import { isAdmin } from '../lib/roles'
-
-const navigation = [
-  { name: 'Home', href: '/' },
-  { name: 'Recipes', href: '/recipes' },
-  { name: 'Add Recipe', href: '/new', adminOnly: true },
-]
+import { NAV_LINKS } from '../lib/constants'
 
 export default function NavNoSearch({ recipes }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   // Hidden while the session loads, so non-admins never see admin links.
   const admin = isAdmin(useSession().data)
-  const links = navigation.filter((item) => admin || !item.adminOnly)
+  const links = NAV_LINKS.filter((item) => admin || !item.adminOnly)
 
   return (
     <div className="relative px-6 pt-6 lg:pl-8 lg:pr-0">
