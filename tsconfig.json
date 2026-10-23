@@ -29,6 +29,7 @@
   },
   "include": [
     "auth.ts",
+    "instrumentation.ts",
     "app/**/*.ts",
     "lib/**/*.ts",
     "types/**/*.d.ts",

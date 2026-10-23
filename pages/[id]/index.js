@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
+import mongoose from 'mongoose'
 import dbConnect from '../../lib/dbConnect'
 import Recipe from '../../models/Recipe'
 import NavNosearch from '../../components/NavNoSearch'
@@ -141,9 +142,12 @@ const RecipePage = ({ recipe }) => {
 }
 
 export async function getServerSideProps({ params }) {
+  if (!mongoose.isValidObjectId(params.id)) return { notFound: true }
+
   await dbConnect()
 
   let recipe = await Recipe.findById(params.id).lean()
+  if (!recipe) return { notFound: true }
   recipe._id = recipe._id.toString()
   recipe = JSON.parse(JSON.stringify(recipe))
 
