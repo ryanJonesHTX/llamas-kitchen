@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState } from 'react'
 import MyCombobox from './MyCombobox'
-import { Dialog } from '@headlessui/react'
+import { Dialog, DialogPanel } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
@@ -81,7 +81,7 @@ export default function Landing({ recipes }) {
                     </div>
                     <input
                       id="search"
-                      className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
+                      className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-hidden focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
                       placeholder="Search"
                       type="search"
                       name="search"
@@ -95,10 +95,11 @@ export default function Landing({ recipes }) {
               </div>
             </nav>
             <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
-              <Dialog.Panel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
+              <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
                 <div className="flex flex-row-reverse items-center justify-between">
                   <button
                     type="button"
+                    data-autofocus
                     className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -142,7 +143,7 @@ export default function Landing({ recipes }) {
                         </div>
                         <input
                           id="search"
-                          className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
+                          className="block w-full rounded-md border border-transparent bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-white focus:outline-hidden focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 sm:text-sm"
                           placeholder="Search"
                           type="search"
                           name="search"
@@ -151,7 +152,7 @@ export default function Landing({ recipes }) {
                     </div> */}
                   </div>
                 </div>
-              </Dialog.Panel>
+              </DialogPanel>
             </Dialog>
           </div>
 
@@ -167,7 +168,7 @@ export default function Landing({ recipes }) {
               <div className="mt-10 flex items-center gap-x-6">
                 <Link
                   href="/recipes"
-                  className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-base font-semibold leading-7 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-base font-semibold leading-7 text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 >
                   All Recipes
                 </Link>
@@ -186,7 +187,7 @@ export default function Landing({ recipes }) {
       </div>
       <div className="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
         <img
-          className="aspect-[4/3] object-cover lg:aspect-auto lg:h-full lg:w-full"
+          className="aspect-4/3 object-cover lg:aspect-auto lg:h-full lg:w-full"
           src="https://res.cloudinary.com/dhcbfbegu/image/upload/v1676182454/llama_rmoylj.webp"
           alt="Llama's Kitchen"
         />

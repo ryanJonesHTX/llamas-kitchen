@@ -5,7 +5,16 @@ import Link from 'next/link'
 import Head from 'next/head'
 import Image from 'next/image'
 import { Fragment, useState, useEffect } from 'react'
-import { Disclosure, Menu, Transition } from '@headlessui/react'
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
+  Transition,
+} from '@headlessui/react'
 import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
 
 const filters = {
@@ -160,17 +169,17 @@ export default function Recipes({ recipes }) {
             Filters
           </h2>
           <div className="relative col-start-1 row-start-1 py-4">
-            <div className="mx-auto flex max-w-7xl space-x-6 divide-x divide-gray-200 px-4 text-sm sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl space-x-6 px-4 text-sm sm:px-6 lg:px-8">
               <div>
-                <Disclosure.Button className="group flex items-center font-medium text-gray-700">
+                <DisclosureButton className="group flex items-center font-medium text-gray-700">
                   <FunnelIcon
                     className="mr-2 h-5 w-5 flex-none text-gray-400 group-hover:text-gray-500"
                     aria-hidden="true"
                   />
                   {filterCount} {filterCount === 1 ? 'Filter' : 'Filters'}
-                </Disclosure.Button>
+                </DisclosureButton>
               </div>
-              <div className="pl-6">
+              <div className="border-l border-gray-200 pl-6">
                 <button
                   type="button"
                   className="text-gray-500"
@@ -181,7 +190,7 @@ export default function Recipes({ recipes }) {
               </div>
             </div>
           </div>
-          <Disclosure.Panel className="border-t border-gray-200 py-10">
+          <DisclosurePanel className="border-t border-gray-200 py-10">
             <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
               <div className="grid auto-rows-min grid-cols-1 gap-y-10 md:grid-cols-2 md:gap-x-6">
                 <fieldset>
@@ -197,7 +206,7 @@ export default function Recipes({ recipes }) {
                           name="time[]"
                           defaultValue={option.value}
                           type="radio"
-                          className="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="h-4 w-4 shrink-0 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           onChange={handleTimeFilterChange}
                         />
                         <label
@@ -223,7 +232,7 @@ export default function Recipes({ recipes }) {
                           name="category[]"
                           defaultValue={option.value}
                           type="checkbox"
-                          className="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="h-4 w-4 shrink-0 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           onChange={() => handleCategoryChange(option.value)}
                         />
                         <label
@@ -238,7 +247,7 @@ export default function Recipes({ recipes }) {
                 </fieldset>
               </div>
             </div>
-          </Disclosure.Panel>
+          </DisclosurePanel>
           <div className="col-start-1 row-start-1 py-4">
             <div className="mx-auto flex max-w-7xl justify-end px-4 sm:px-6 lg:px-8">
               <Menu
@@ -246,13 +255,13 @@ export default function Recipes({ recipes }) {
                 className="relative inline-block"
               >
                 <div className="flex">
-                  <Menu.Button className="group inline-flex justify-center text-sm font-medium text-gray-700 hover:text-gray-900">
+                  <MenuButton className="group inline-flex justify-center text-sm font-medium text-gray-700 hover:text-gray-900">
                     Sort
                     <ChevronDownIcon
-                      className="-mr-1 ml-1 h-5 w-5 flex-shrink-0 text-gray-400 group-hover:text-gray-500"
+                      className="-mr-1 ml-1 h-5 w-5 shrink-0 text-gray-400 group-hover:text-gray-500"
                       aria-hidden="true"
                     />
-                  </Menu.Button>
+                  </MenuButton>
                 </div>
 
                 <Transition
@@ -264,28 +273,28 @@ export default function Recipes({ recipes }) {
                   leaveFrom="transform opacity-100 scale-100"
                   leaveTo="transform opacity-0 scale-95"
                 >
-                  <Menu.Items className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <MenuItems modal={false} className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-2xl ring-1 ring-black/5 focus:outline-hidden">
                     <div className="py-1">
                       {sortOptions.map((option) => (
-                        <Menu.Item key={option.value}>
-                          {({ active }) => (
+                        <MenuItem key={option.value}>
+                          {({ focus }) => (
                             <span
                               onClick={() => handleSort(option.value)}
                               className={classNames(
                                 option.current
                                   ? 'font-medium text-gray-900'
                                   : 'text-gray-500',
-                                active ? 'bg-gray-100' : '',
+                                focus ? 'bg-gray-100' : '',
                                 'block px-4 py-2 text-sm'
                               )}
                             >
                               {option.name}
                             </span>
                           )}
-                        </Menu.Item>
+                        </MenuItem>
                       ))}
                     </div>
-                  </Menu.Items>
+                  </MenuItems>
                 </Transition>
               </Menu>
             </div>
@@ -310,7 +319,7 @@ export default function Recipes({ recipes }) {
                 key={recipe._id}
                 className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
               >
-                <div className="aspect-w-1 aspect-h-1 overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
+                <div className="aspect-square overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
                   <Image
                     src={recipe.photo}
                     alt={recipe.name}
@@ -349,7 +358,7 @@ export default function Recipes({ recipes }) {
           <div className="min-w-0 flex-1">
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               Previous
             </a>
@@ -358,38 +367,38 @@ export default function Recipes({ recipes }) {
         {/* Current: "border-indigo-600 ring-1 ring-indigo-600", Default: "border-gray-300" */}
         {/* <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               1
             </a>
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               2
             </a>
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-indigo-600 bg-white px-4 ring-1 ring-indigo-600 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-indigo-600 bg-white px-4 ring-1 ring-indigo-600 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               3
             </a>
             <span className="inline-flex h-10 items-center px-1.5 text-gray-500">...</span>
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               8
             </a>
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               9
             </a>
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               10
             </a>
@@ -397,7 +406,7 @@ export default function Recipes({ recipes }) {
           <div className="flex min-w-0 flex-1 justify-end">
             <a
               href="#"
-              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-25 focus:ring-offset-1 focus:ring-offset-indigo-600"
+              className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 hover:bg-gray-100 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-600/25 focus:ring-offset-1 focus:ring-offset-indigo-600"
             >
               Next
             </a>

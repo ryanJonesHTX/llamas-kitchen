@@ -6,7 +6,6 @@ import mongoose from 'mongoose'
 import dbConnect from '../../lib/dbConnect'
 import Recipe from '../../models/Recipe'
 import NavNosearch from '../../components/NavNoSearch'
-import autoprefixer from 'autoprefixer'
 
 /* Allows you to view pet card info and delete pet card*/
 const RecipePage = ({ recipe }) => {
@@ -110,7 +109,7 @@ const RecipePage = ({ recipe }) => {
           <div className="mt-6 grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
             {relatedProducts.map((relatedProduct) => (
               <div key={relatedProduct.id} className="group relative">
-                <div className="min-h-80 aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-md group-hover:opacity-75 lg:aspect-none lg:h-80">
+                <div className="min-h-80 aspect-square w-full overflow-hidden rounded-md group-hover:opacity-75 lg:aspect-auto lg:h-80">
                   <img
                     src={relatedProduct.imageSrc}
                     alt={relatedProduct.imageAlt}
