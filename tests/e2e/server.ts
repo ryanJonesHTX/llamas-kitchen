@@ -24,7 +24,8 @@ await disconnect()
 
 // Fake auth values: tests sign in by seeding sessions (tests/e2e/auth.ts) and
 // never reach GitHub or Resend. Plain http keeps the cookie unprefixed
-// (authjs.session-token).
+// (authjs.session-token). Cloudinary values are fake too: tests route
+// api.cloudinary.com in the browser.
 const e2eEnv = {
   MONGODB_URI: E2E_MONGODB_URI,
   AUTH_SECRET: 'e2e-test-secret-not-for-production',
@@ -35,6 +36,9 @@ const e2eEnv = {
   AUTH_RESEND_KEY: 'e2e-fake-resend-key',
   EMAIL_FROM: 'e2e@example.com',
   ADMIN_EMAILS: '',
+  CLOUDINARY_CLOUD_NAME: 'e2e-cloud',
+  CLOUDINARY_API_KEY: 'e2e-fake-cloudinary-key',
+  CLOUDINARY_API_SECRET: 'e2e-fake-cloudinary-secret',
 }
 
 const next = spawn(

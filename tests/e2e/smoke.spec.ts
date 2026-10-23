@@ -1,7 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type Request } from '@playwright/test'
 import { signInAs } from './auth.ts'
 import { disconnect, reseed } from './db.ts'
 import { seedRecipes } from './fixtures.ts'
+import { CLOUDINARY_UPLOAD_URL, uploadFields } from './uploads.ts'
 
 // Every test starts from exactly the seed fixtures, so no test depends on
 // another (the add-recipe test creates data).
@@ -149,13 +150,13 @@ test('adding a recipe shows it on the home page and its own page', async ({
 }) => {
   await signInAs(context, { email: 'admin@example.com', role: 'admin' })
   const uploadedPhoto = 'https://res.cloudinary.com/demo/image/upload/sample.jpg'
-  await page.route(
-    'https://api.cloudinary.com/v1_1/*/image/upload/',
-    (route) =>
-      route.fulfill({
-        json: { secure_url: uploadedPhoto, public_id: 'e2e-added-lasagna' },
-      })
-  )
+  const uploads: Request[] = []
+  await page.route('https://api.cloudinary.com/**', (route) => {
+    uploads.push(route.request())
+    return route.fulfill({
+      json: { secure_url: uploadedPhoto, public_id: 'e2e-added-lasagna' },
+    })
+  })
 
   await page.goto('/new')
   // Two labels point at #name ("Recipe Name" and "Submitted By"), so match
@@ -175,6 +176,16 @@ test('adding a recipe shows it on the home page and its own page', async ({
     buffer: Buffer.from('not really a png'),
   })
   await expect(page.getByText('Image uploaded!')).toBeVisible()
+
+  // A signed upload, sent to the cloud name from the server's env.
+  expect(uploads).toHaveLength(1)
+  expect(uploads[0].method()).toBe('POST')
+  expect(uploads[0].url()).toBe(CLOUDINARY_UPLOAD_URL)
+  const fields = await uploadFields(uploads[0])
+  for (const name of ['signature', 'api_key', 'timestamp']) {
+    expect(fields.get(name), name).toBeTruthy()
+  }
+  expect(fields.has('upload_preset')).toBe(false)
 
   await page.getByRole('button', { name: 'Submit' }).click()
 

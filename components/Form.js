@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { mutate } from 'swr'
 import { CheckCircleIcon } from '@heroicons/react/20/solid'
+import { MAX_UPLOAD_BYTES } from '../lib/uploads'
 
 const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
   const router = useRouter()
@@ -11,6 +12,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
   const [ingredients, setIngredients] = useState(recipeForm.ingredients)
   const [ingredient, setIngredient] = useState('')
   const [uploaded, setUploaded] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   const [form, setForm] = useState({
     name: recipeForm.name,
@@ -123,28 +125,60 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
     ])
   }
 
-  // File uploader
+  // File uploader: checks the file, gets a signature from our API, then
+  // uploads straight to Cloudinary.
   const handleUploadInput = async (e) => {
-    const files = [...e.target.files]
-    const formData = new FormData()
+    const input = e.target
+    const file = input.files[0]
+    if (!file) return
+    setUploadError('')
 
-    for (let file of files) {
-      formData.append('file', file)
+    // Clearing the input lets the same file be picked again after an error.
+    const reject = (message) => {
+      setUploadError(message)
+      input.value = ''
     }
 
-    formData.append('upload_preset', 'recipe-images')
+    if (!file.type.startsWith('image/')) {
+      reject('Please choose an image file.')
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      reject('Images must be 10 MB or smaller.')
+      return
+    }
 
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/dhcbfbegu/image/upload/`,
-      {
+    try {
+      const signatureRes = await fetch('/api/uploads/signature', {
         method: 'POST',
-        body: formData,
-      }
-    )
-    const data = await res.json()
+      })
+      if (!signatureRes.ok) throw new Error(signatureRes.status)
+      const signed = await signatureRes.json()
 
-    setForm({ ...form, photo: data.secure_url, cloudinaryId: data.public_id })
-    setUploaded(true)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('api_key', signed.apiKey)
+      formData.append('timestamp', signed.timestamp)
+      formData.append('signature', signed.signature)
+      formData.append('folder', signed.folder)
+      formData.append('allowed_formats', signed.allowedFormats)
+      formData.append('transformation', signed.transformation)
+
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${signed.cloudName}/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      if (!res.ok) throw new Error(res.status)
+      const data = await res.json()
+
+      setForm({ ...form, photo: data.secure_url, cloudinaryId: data.public_id })
+      setUploaded(true)
+    } catch (error) {
+      reject('Image upload failed. Please try again.')
+    }
   }
 
   return (
@@ -371,6 +405,9 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                               name="photo"
                               type="file"
                               accept="image/*"
+                              aria-describedby={
+                                uploadError ? 'file-upload-error' : undefined
+                              }
                               onChange={handleUploadInput}
                               className="sr-only"
                             />
@@ -378,6 +415,15 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
                         </div>
                       </div>
                     </div>
+                    {uploadError && (
+                      <p
+                        id="file-upload-error"
+                        role="alert"
+                        className="mt-2 text-sm text-red-600"
+                      >
+                        {uploadError}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="sm:col-span-6 rounded-md bg-green-50 p-4">
@@ -462,12 +508,6 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
       </div>
     </div>
   )
-}
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
 }
 
 export default Form
