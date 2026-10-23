@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState } from 'react'
 import MyCombobox from './MyCombobox'
-import { Dialog } from '@headlessui/react'
+import { Dialog, DialogPanel } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
@@ -95,10 +95,11 @@ export default function Landing({ recipes }) {
               </div>
             </nav>
             <Dialog as="div" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
-              <Dialog.Panel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
+              <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
                 <div className="flex flex-row-reverse items-center justify-between">
                   <button
                     type="button"
+                    data-autofocus
                     className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -151,7 +152,7 @@ export default function Landing({ recipes }) {
                     </div> */}
                   </div>
                 </div>
-              </Dialog.Panel>
+              </DialogPanel>
             </Dialog>
           </div>
 
