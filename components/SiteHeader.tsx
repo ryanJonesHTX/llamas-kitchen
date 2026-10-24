@@ -15,8 +15,7 @@ import { NAV_LINKS } from '../lib/constants'
 import type { RecipeSearchOption } from '../lib/recipes/queries'
 import type { Theme } from '../lib/theme'
 
-const logo =
-  'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp'
+const logo = '/images/llama-icon.webp'
 
 // Recipes covers the list and recipe pages, but not edit pages; the other
 // links match their own path only.

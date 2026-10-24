@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { recipeInputSchema } from '../../lib/recipes/input'
-import { MAX_RECIPE_TAGS } from '../../lib/constants'
+import {
+  MAX_INGREDIENT_ITEM_LENGTH,
+  MAX_INGREDIENT_UNIT_LENGTH,
+  MAX_RECIPE_CREDIT_LENGTH,
+  MAX_RECIPE_DESCRIPTION_LENGTH,
+  MAX_RECIPE_INGREDIENTS,
+  MAX_RECIPE_NAME_LENGTH,
+  MAX_RECIPE_NOTES_LENGTH,
+  MAX_RECIPE_STEP_LENGTH,
+  MAX_RECIPE_STEPS,
+  MAX_RECIPE_TAG_LENGTH,
+  MAX_RECIPE_TAGS,
+} from '../../lib/constants'
 
 // recipeInputSchema: what a person or the import parser supplies. The server
 // sets submittedBy, status, rejectionReason, publishedAt and slug.
@@ -182,6 +194,96 @@ describe('recipeInputSchema', () => {
     })
   })
 
+  // Each case builds an input with n of something. The form shows a list
+  // entry's message under the whole list, so those name the list.
+  describe.each<[string, number, string, (n: number) => Input, string]>([
+    [
+      'name length',
+      MAX_RECIPE_NAME_LENGTH,
+      'name',
+      (n) => ({ name: 'x'.repeat(n) }),
+      `must be at most ${MAX_RECIPE_NAME_LENGTH} characters`,
+    ],
+    [
+      'description length',
+      MAX_RECIPE_DESCRIPTION_LENGTH,
+      'description',
+      (n) => ({ description: 'x'.repeat(n) }),
+      `must be at most ${MAX_RECIPE_DESCRIPTION_LENGTH} characters`,
+    ],
+    [
+      'notes length',
+      MAX_RECIPE_NOTES_LENGTH,
+      'notes',
+      (n) => ({ notes: 'x'.repeat(n) }),
+      `must be at most ${MAX_RECIPE_NOTES_LENGTH} characters`,
+    ],
+    [
+      'credit length',
+      MAX_RECIPE_CREDIT_LENGTH,
+      'credit',
+      (n) => ({ credit: 'x'.repeat(n) }),
+      `must be at most ${MAX_RECIPE_CREDIT_LENGTH} characters`,
+    ],
+    [
+      'step length',
+      MAX_RECIPE_STEP_LENGTH,
+      'steps',
+      (n) => ({ steps: ['Mix.', 'x'.repeat(n)] }),
+      `each step must be at most ${MAX_RECIPE_STEP_LENGTH} characters`,
+    ],
+    [
+      'step count',
+      MAX_RECIPE_STEPS,
+      'steps',
+      (n) => ({ steps: Array.from({ length: n }, () => 'Mix.') }),
+      `at most ${MAX_RECIPE_STEPS} steps`,
+    ],
+    [
+      'ingredient item length',
+      MAX_INGREDIENT_ITEM_LENGTH,
+      'ingredients',
+      (n) => ({ ingredients: [{ quantity: 1, unit: null, item: 'x'.repeat(n) }] }),
+      `each ingredient item must be at most ${MAX_INGREDIENT_ITEM_LENGTH} characters`,
+    ],
+    [
+      'ingredient unit length',
+      MAX_INGREDIENT_UNIT_LENGTH,
+      'ingredients',
+      (n) => ({ ingredients: [{ quantity: 1, unit: 'x'.repeat(n), item: 'flour' }] }),
+      `each ingredient unit must be at most ${MAX_INGREDIENT_UNIT_LENGTH} characters`,
+    ],
+    [
+      'ingredient count',
+      MAX_RECIPE_INGREDIENTS,
+      'ingredients',
+      (n) => ({ ingredients: Array.from({ length: n }, () => ({ quantity: 1, unit: null, item: 'flour' })) }),
+      `at most ${MAX_RECIPE_INGREDIENTS} ingredients`,
+    ],
+    [
+      'tag length',
+      MAX_RECIPE_TAG_LENGTH,
+      'tags',
+      (n) => ({ tags: ['x'.repeat(n)] }),
+      `each tag must be at most ${MAX_RECIPE_TAG_LENGTH} characters`,
+    ],
+  ])('%s', (_label, max, path, build, message) => {
+    it(`allows ${max} but not ${max + 1}`, () => {
+      parsed(validInput(build(max)))
+      expectIssueOn(validInput(build(max + 1)), path)
+    })
+
+    it('gives a readable message', () => {
+      const result = recipeInputSchema.safeParse(validInput(build(max + 1)))
+      expect(result.error?.issues.map((issue) => issue.message)).toEqual([message])
+    })
+  })
+
+  it('counts a padded value after trimming', () => {
+    const padded = ` ${'x'.repeat(MAX_RECIPE_DESCRIPTION_LENGTH)} `
+    expect(parsed(validInput({ description: padded })).description).toHaveLength(MAX_RECIPE_DESCRIPTION_LENGTH)
+  })
+
   describe('numbers', () => {
     it('coerces numeric strings from form inputs', () => {
       const data = parsed(validInput({ servings: '6', prepTime: '15', cookTime: '0' }))
@@ -200,6 +302,24 @@ describe('recipeInputSchema', () => {
     it.each([['0'], [0], [1.5]])('rejects servings %j, which is not an integer >= 1', (servings) => {
       expectIssueOn(validInput({ servings }), 'servings')
     })
+  })
+
+  // Only IDs the upload action produces: one segment inside the upload folder.
+  it.each([['recipes/beef-stew'], ['recipes/Abc_12-x']])('accepts the imagePublicId %j', (imagePublicId) => {
+    expect(parsed(validInput({ imagePublicId })).imagePublicId).toBe(imagePublicId)
+  })
+
+  it.each([
+    ['another folder', 'other/beef-stew'],
+    ['the old folder', 'recipe-images/x'],
+    ['no folder', 'beef-stew'],
+    ['a parent segment', 'recipes/../secret'],
+    ['a double slash', 'recipes//beef-stew'],
+    ['a colon', 'recipes/a:b'],
+    ['a full URL', 'https://res.cloudinary.com/demo/image/upload/recipes/beef-stew'],
+    ['an empty segment', 'recipes/'],
+  ])('rejects an imagePublicId with %s', (_label, imagePublicId) => {
+    expectIssueOn(validInput({ imagePublicId }), 'imagePublicId')
   })
 
   it('rejects a sourceUrl that is not a URL', () => {

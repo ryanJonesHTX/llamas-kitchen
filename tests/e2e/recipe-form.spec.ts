@@ -1,6 +1,7 @@
+import { MAX_INGREDIENT_ITEM_LENGTH, MAX_RECIPE_STEP_LENGTH } from '../../lib/constants.ts'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
-import { deleteSessions, disconnect, findRecipe, reseed } from './db.ts'
+import { deleteSessions, disconnect, findRecipe, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, SEED_ADMIN_ID, seedRecipe } from './fixtures.ts'
 import {
   alertWith,
@@ -164,6 +165,63 @@ test('saving a slug another recipe holds (even a pending one) shows the error on
   await expect(formField(page, 'Slug')).toHaveAccessibleDescription(/another recipe already uses this slug/)
   await expect(page).toHaveURL(`/recipes/${stew.slug}/edit`)
   expect((await findRecipe({ _id: stew._id }))?.slug).toBe(stew.slug)
+})
+
+// The step's error is filed under its index, which has no input of its own;
+// the Steps textarea shows and announces it.
+test('an over-long step shows its error on the Steps field and saves nothing', async ({ page }) => {
+  await page.goto(`/recipes/${stew.slug}/edit`)
+  const before = await findRecipe({ _id: stew._id })
+
+  await formField(page, 'Steps').fill([...stew.steps, 'x'.repeat(MAX_RECIPE_STEP_LENGTH + 1)].join('\n'))
+  await saveButton(page).click()
+
+  await expect(formField(page, 'Steps')).toHaveAccessibleDescription(
+    new RegExp(`each step must be at most ${MAX_RECIPE_STEP_LENGTH} characters`)
+  )
+  await expect(formField(page, 'Steps')).toBeFocused()
+  await expect(page).toHaveURL(`/recipes/${stew.slug}/edit`)
+  expect(await findRecipe({ _id: stew._id })).toEqual(before)
+})
+
+// The ingredient inputs are registered as ingredients.N.line, so the form
+// moves focus to the first one itself.
+test('an over-long ingredient shows its error on the ingredient inputs, focuses the first and saves nothing', async ({
+  page,
+}) => {
+  await page.goto(`/recipes/${stew.slug}/edit`)
+  const before = await findRecipe({ _id: stew._id })
+
+  await ingredientLine(page, 2).fill('x'.repeat(MAX_INGREDIENT_ITEM_LENGTH + 1))
+  await saveButton(page).click()
+
+  await expect(ingredientLine(page, 1)).toHaveAccessibleDescription(
+    new RegExp(`each ingredient item must be at most ${MAX_INGREDIENT_ITEM_LENGTH} characters`)
+  )
+  await expect(ingredientLine(page, 1)).toBeFocused()
+  await expect(page).toHaveURL(`/recipes/${stew.slug}/edit`)
+  expect(await findRecipe({ _id: stew._id })).toEqual(before)
+})
+
+// The ID is stored before the upload-folder migration, so it fails the input
+// schema. The form has no input for it, so the alert says what's wrong.
+test('saving a recipe whose stored image ID is invalid shows an alert and saves nothing', async ({ page }) => {
+  const oldImage = {
+    ...stew,
+    _id: '65a0000000000000000000ff',
+    name: 'E2E Old Image Stew',
+    slug: 'e2e-old-image-stew',
+    imagePublicId: 'recipe-images/x',
+  }
+  await insertRecipes([oldImage])
+  await page.goto(`/recipes/${oldImage.slug}/edit`)
+  const before = await findRecipe({ _id: oldImage._id })
+
+  await saveButton(page).click()
+
+  await expect(alertWith(page, /This recipe's image is invalid\. Upload the image again\./)).toBeVisible()
+  await expect(page).toHaveURL(`/recipes/${oldImage.slug}/edit`)
+  expect(await findRecipe({ _id: oldImage._id })).toEqual(before)
 })
 
 test('the Notes field on edit is pre-filled and saves a change', async ({ page }) => {

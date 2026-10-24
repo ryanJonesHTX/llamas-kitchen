@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import mongoose from 'mongoose'
 import { Recipe } from '../../lib/recipes/model'
+import {
+  MAX_INGREDIENT_ITEM_LENGTH,
+  MAX_INGREDIENT_UNIT_LENGTH,
+  MAX_RECIPE_CREDIT_LENGTH,
+  MAX_RECIPE_DESCRIPTION_LENGTH,
+  MAX_RECIPE_INGREDIENTS,
+  MAX_RECIPE_NOTES_LENGTH,
+  MAX_RECIPE_STEP_LENGTH,
+  MAX_RECIPE_STEPS,
+  MAX_RECIPE_TAG_LENGTH,
+} from '../../lib/constants'
 import { recipeDoc, pendingDoc, rejectedDoc } from '../fixtures/recipes'
 
 // Validation rules and indexes from .claude/SCHEMA-PROPOSAL.md, checked
@@ -195,6 +206,39 @@ describe('new Recipe model', () => {
     it('rejects duplicates, compared after trimming and lowercasing', () => {
       expectInvalid(recipeDoc({ tags: ['dessert', 'quick', 'dessert'] }), 'tags')
       expectInvalid(recipeDoc({ tags: ['dessert', ' Dessert'] }), 'tags')
+    })
+  })
+
+  // The same limits as recipeInputSchema: each case builds a recipe with n of something.
+  describe.each<[string, number, string, (n: number) => Doc]>([
+    ['description length', MAX_RECIPE_DESCRIPTION_LENGTH, 'description', (n) => ({ description: 'x'.repeat(n) })],
+    ['notes length', MAX_RECIPE_NOTES_LENGTH, 'notes', (n) => ({ notes: 'x'.repeat(n) })],
+    ['credit length', MAX_RECIPE_CREDIT_LENGTH, 'credit', (n) => ({ credit: 'x'.repeat(n) })],
+    ['step length', MAX_RECIPE_STEP_LENGTH, 'steps', (n) => ({ steps: ['x'.repeat(n)] })],
+    ['step count', MAX_RECIPE_STEPS, 'steps', (n) => ({ steps: Array.from({ length: n }, () => 'Mix.') })],
+    [
+      'ingredient item length',
+      MAX_INGREDIENT_ITEM_LENGTH,
+      'ingredients',
+      (n) => ({ ingredients: [{ quantity: 1, unit: null, item: 'x'.repeat(n) }] }),
+    ],
+    [
+      'ingredient unit length',
+      MAX_INGREDIENT_UNIT_LENGTH,
+      'ingredients',
+      (n) => ({ ingredients: [{ quantity: 1, unit: 'x'.repeat(n), item: 'flour' }] }),
+    ],
+    [
+      'ingredient count',
+      MAX_RECIPE_INGREDIENTS,
+      'ingredients',
+      (n) => ({ ingredients: Array.from({ length: n }, () => ({ quantity: 1, unit: null, item: 'flour' })) }),
+    ],
+    ['tag length', MAX_RECIPE_TAG_LENGTH, 'tags', (n) => ({ tags: ['x'.repeat(n)] })],
+  ])('%s', (_label, max, path, build) => {
+    it(`allows ${max} but not ${max + 1}`, () => {
+      expectValid(recipeDoc(build(max)))
+      expectInvalid(recipeDoc(build(max + 1)), path)
     })
   })
 

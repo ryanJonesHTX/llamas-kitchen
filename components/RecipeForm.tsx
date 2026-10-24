@@ -64,6 +64,27 @@ const EMPTY_VALUES: RecipeFormValues = {
   credit: '',
 }
 
+// Fields with an input, in form order, for moving focus to the first invalid one.
+const FIELD_ORDER = [
+  'name',
+  'slug',
+  'description',
+  'tags',
+  'ingredients',
+  'steps',
+  'prepTime',
+  'cookTime',
+  'servings',
+  'notes',
+  'credit',
+] as const
+
+// Fields with no input of their own; an error on one goes to the form's alert.
+const NO_INPUT_ERRORS = {
+  imagePublicId: "This recipe's image is invalid. Upload the image again.",
+  sourceUrl: "This recipe's source link is invalid, and it can't be changed here.",
+} as const
+
 const SAVE_FAILED = 'Something went wrong and the recipe was not saved. Reload the page and try again.'
 const UPLOAD_FAILED = 'Something went wrong and the image was not uploaded. Reload the page and try again.'
 
@@ -80,6 +101,18 @@ const SECONDARY_BUTTON =
 // Marks an input invalid and points it at its error message.
 function errorProps(id: string, error: string | undefined) {
   return error ? { 'aria-invalid': true, 'aria-describedby': `${id}-error` } : {}
+}
+
+// A list field's first message, wherever it was filed: on the list itself
+// (setError), under its root (the resolver, for a field array), or under an
+// entry's index (an over-long step, say), which has no input of its own.
+function listError(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  if ('message' in error && typeof error.message === 'string') return error.message
+  for (const [key, value] of Object.entries(error)) {
+    const message = key === 'ref' ? undefined : listError(value)
+    if (message) return message
+  }
 }
 
 function FieldError({ id, error }: { id: string; error: string | undefined }) {
@@ -159,10 +192,14 @@ export default function RecipeForm({
     handleSubmit,
     register,
     setError,
+    setFocus,
     setValue,
   } = useForm<RecipeFormValues, unknown, RecipeFormOutput>({
     resolver: zodResolver(recipeFormSchema),
     defaultValues: initialValues,
+    // showInvalid does it: RHF can't match an ingredients error to the
+    // ingredient inputs, which are registered as ingredients.N.line.
+    shouldFocusError: false,
   })
   const ingredients = useFieldArray({ control, name: 'ingredients' })
   const imagePublicId = useWatch({ control, name: 'imagePublicId' })
@@ -173,8 +210,18 @@ export default function RecipeForm({
     if (!localPreview) return
     return () => URL.revokeObjectURL(localPreview)
   }, [localPreview])
-  // The resolver files a list-level error under root; setError files it on the list itself.
-  const ingredientsError = errors.ingredients?.root?.message ?? errors.ingredients?.message
+  const ingredientsError = listError(errors.ingredients)
+  const stepsError = listError(errors.steps)
+  const tagsError = listError(errors.tags)
+
+  // Shows errors that have no input in the alert, and focuses the first
+  // invalid input; errors on the ingredients list focus its first input.
+  function showInvalid(invalid: string[]) {
+    const noInput = Object.entries(NO_INPUT_ERRORS).find(([name]) => invalid.includes(name))
+    if (noInput) setError('root.server', { message: noInput[1] })
+    const first = FIELD_ORDER.find((name) => invalid.includes(name))
+    if (first) setFocus(first === 'ingredients' ? 'ingredients.0.line' : first)
+  }
 
   async function save(values: RecipeFormOutput) {
     let result: SaveResult
@@ -190,9 +237,10 @@ export default function RecipeForm({
     }
     if ('formError' in result) return setError('root.server', { message: result.formError })
     // The action's field errors are keyed by schema field, and the form uses the same names.
-    Object.entries(result.fieldErrors).forEach(([field, messages], index) => {
-      setError(field as FieldPath<RecipeFormValues>, { message: messages[0] }, { shouldFocus: index === 0 })
+    Object.entries(result.fieldErrors).forEach(([field, messages]) => {
+      setError(field as FieldPath<RecipeFormValues>, { message: messages[0] })
     })
+    showInvalid(Object.keys(result.fieldErrors))
   }
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -240,7 +288,7 @@ export default function RecipeForm({
         {recipeId ? 'Change any field and save the recipe.' : 'Please fill out the form to add a new recipe.'}
       </p>
 
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit(save)} noValidate>
+      <form className="mt-8 space-y-6" onSubmit={handleSubmit(save, (invalid) => showInvalid(Object.keys(invalid)))} noValidate>
         <Card id="basics" title="Basics">
           <Field id="name" label="Recipe name" error={errors.name?.message}>
             <input
@@ -284,13 +332,13 @@ export default function RecipeForm({
             />
           </Field>
 
-          <Field id="tags" label="Tags" error={errors.tags?.message} help="Separate tags with commas.">
+          <Field id="tags" label="Tags" error={tagsError} help="Separate tags with commas.">
             <input
               id="tags"
               type="text"
               className={INPUT}
               {...register('tags')}
-              {...errorProps('tags', errors.tags?.message)}
+              {...errorProps('tags', tagsError)}
             />
           </Field>
         </Card>
@@ -343,10 +391,10 @@ export default function RecipeForm({
             rows={8}
             className={`mt-4 ${INPUT}`}
             {...register('steps')}
-            {...errorProps('steps', errors.steps?.message)}
+            {...errorProps('steps', stepsError)}
           />
           <p className={HELP}>One step per line.</p>
-          <FieldError id="steps" error={errors.steps?.message} />
+          <FieldError id="steps" error={stepsError} />
         </section>
 
         <Card id="times" title="Times & servings">

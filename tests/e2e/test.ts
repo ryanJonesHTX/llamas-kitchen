@@ -5,7 +5,7 @@ export { expect } from '@playwright/test'
 
 const CLOUDINARY_IMAGES = 'https://res.cloudinary.com/'
 
-// Recipe photos and the logo live on res.cloudinary.com. The browser asks for
+// Recipe photos live on res.cloudinary.com. The browser asks for
 // them directly (<img>) or through Next's optimizer (/_next/image?url=...),
 // which would make the server download them. Both are answered here with a
 // 1x1 PNG, so no test reaches the internet for an image.

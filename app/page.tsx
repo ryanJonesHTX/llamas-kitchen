@@ -6,7 +6,7 @@ import type { RecipeCardRecord } from '../lib/recipes/listing'
 import { latestPublished } from '../lib/recipes/queries'
 import { isAdmin } from '../lib/roles'
 
-const heroImage = 'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676182454/llama_rmoylj.webp'
+const heroImage = '/images/llama.webp'
 
 export default async function HomePage() {
   const [session, recipes] = await Promise.all([auth(), latestPublished(4)])

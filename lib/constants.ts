@@ -20,3 +20,14 @@ export const RECIPE_PAGE_SIZE = 24
 export const MAX_RECIPE_NAME_LENGTH = 120
 
 export const MAX_RECIPE_TAGS = 10
+
+// Chosen with room over the longest values on dev; `npm run check-recipe-data` reports a database's longest values.
+export const MAX_RECIPE_DESCRIPTION_LENGTH = 1000
+export const MAX_RECIPE_NOTES_LENGTH = 4000
+export const MAX_RECIPE_CREDIT_LENGTH = 200
+export const MAX_RECIPE_STEP_LENGTH = 2000
+export const MAX_RECIPE_STEPS = 100
+export const MAX_INGREDIENT_ITEM_LENGTH = 200
+export const MAX_INGREDIENT_UNIT_LENGTH = 40
+export const MAX_RECIPE_INGREDIENTS = 100
+export const MAX_RECIPE_TAG_LENGTH = 40

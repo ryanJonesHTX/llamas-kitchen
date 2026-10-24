@@ -49,6 +49,9 @@ jobs:
           # `next build` imports it while collecting page data. Placeholder
           # only: the build never connects to it.
           MONGODB_URI: mongodb://127.0.0.1:1/ci-build-placeholder
+          # next.config.js throws without it. tests/e2e/server.ts starts the
+          # app with the same fake cloud.
+          CLOUDINARY_CLOUD_NAME: e2e-cloud
 
       - run: npx playwright install --with-deps chromium
 
