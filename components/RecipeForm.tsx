@@ -14,6 +14,7 @@ import {
   type SaveResult,
   type UploadResult,
 } from '../app/recipes/actions'
+import { flashCookie } from '../lib/flash'
 import { parseIngredient } from '../lib/ingredients'
 import { recipeInputSchema } from '../lib/recipes/input'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
@@ -128,6 +129,12 @@ function Card({ id, title, children }: { id: string; title: string; children: Re
   )
 }
 
+// Has the next page show "Recipe saved" (components/Toaster.tsx). Set here,
+// not in the action: a cookie set by a server action makes Next re-render this page too.
+function flashSaved() {
+  document.cookie = flashCookie('saved')
+}
+
 // Creates a recipe, or with `recipeId` edits that recipe (and its slug).
 // Images upload through the uploadRecipeImage action as soon as one is chosen.
 // `imageUrlPrefix` (recipeImageUrlPrefix) plus a public ID is the preview's Cloudinary URL.
@@ -177,7 +184,10 @@ export default function RecipeForm({
     } catch {
       return setError('root.server', { message: SAVE_FAILED })
     }
-    if (result.ok) return router.push(`/recipes/${result.slug}`)
+    if (result.ok) {
+      flashSaved()
+      return router.push(`/recipes/${result.slug}`)
+    }
     if ('formError' in result) return setError('root.server', { message: result.formError })
     // The action's field errors are keyed by schema field, and the form uses the same names.
     Object.entries(result.fieldErrors).forEach(([field, messages], index) => {

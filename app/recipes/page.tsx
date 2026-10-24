@@ -1,10 +1,17 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import { FunnelIcon } from '@heroicons/react/24/outline'
 import RecipeCard from '../../components/RecipeCard'
 import RecipeFilters from '../../components/RecipeFilters'
-import { listPublished, parseListingParams, type ListingSearchParams } from '../../lib/recipes/listing'
+import RecipeGridSkeleton from '../../components/RecipeGridSkeleton'
+import {
+  listPublished,
+  parseListingParams,
+  type ListingQuery,
+  type ListingSearchParams,
+} from '../../lib/recipes/listing'
 import { listingHref } from '../../lib/recipes/listingHref'
 import { publishedTagsInUse } from '../../lib/recipes/queries'
 
@@ -13,8 +20,8 @@ export const metadata: Metadata = { title: 'Llamas Kitchen - Recipes' }
 export default async function RecipesPage({ searchParams }: { searchParams: Promise<ListingSearchParams> }) {
   const query = parseListingParams(await searchParams)
   if (!query) notFound()
-  const [{ recipes, nextCursor }, tagsInUse] = await Promise.all([listPublished(query), publishedTagsInUse()])
 
+  // Invalid params 404 above, before the boundary starts streaming with a 200.
   return (
     <main className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <div className="py-12 sm:py-16">
@@ -22,6 +29,19 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
         <p className="mt-4 text-lg text-muted">Everything from the Llama's Kitchen collection.</p>
       </div>
 
+      <Suspense fallback={<RecipeGridSkeleton />}>
+        <RecipeResults query={query} />
+      </Suspense>
+    </main>
+  )
+}
+
+// The filters, grid and pagination: everything that reads the database.
+async function RecipeResults({ query }: { query: ListingQuery }) {
+  const [{ recipes, nextCursor }, tagsInUse] = await Promise.all([listPublished(query), publishedTagsInUse()])
+
+  return (
+    <>
       <RecipeFilters state={{ tags: query.tags, time: query.time, sort: query.sort }} tagsInUse={tagsInUse} />
 
       <section aria-labelledby="recipes-heading" className="mt-8">
@@ -55,6 +75,6 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
           </Link>
         </nav>
       )}
-    </main>
+    </>
   )
 }

@@ -5,6 +5,7 @@ import { Fraunces, Inter } from 'next/font/google'
 import { SessionProvider } from 'next-auth/react'
 import { auth } from '../auth'
 import SiteHeader from '../components/SiteHeader'
+import Toaster from '../components/Toaster'
 import { publishedSearchOptions } from '../lib/recipes/queries'
 import { parseTheme, THEME_COOKIE } from '../lib/theme'
 import '../styles/globals.css'
@@ -38,6 +39,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <SiteHeader searchOptions={searchOptions} theme={theme} />
           {children}
         </SessionProvider>
+        <Toaster />
       </body>
     </html>
   )
