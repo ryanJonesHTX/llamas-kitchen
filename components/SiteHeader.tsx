@@ -60,7 +60,7 @@ export default function SiteHeader({
   const closeMenu = () => setMobileMenuOpen(false)
 
   return (
-    <header className="border-b border-border bg-surface">
+    <header className="border-b border-border bg-surface print:hidden">
       <nav
         className="mx-auto flex h-16 max-w-7xl items-center gap-x-8 px-4 sm:px-6 lg:px-8 xl:gap-x-10"
         aria-label="Global"

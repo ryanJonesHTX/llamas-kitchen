@@ -8,4 +8,12 @@ export const ingredientItems = (page: Page) =>
 
 export const stepsList = (page: Page) => page.getByRole('list', { name: 'Steps', exact: true })
 
+// Each step's text. The number badge beside it is decorative, so it's left out.
+export const stepTexts = (page: Page) => stepsList(page).getByRole('listitem').getByRole('paragraph')
+
 export const tagItems = (page: Page) => page.getByRole('list', { name: 'Tags', exact: true }).getByRole('listitem')
+
+// The facts row is the page's only <dl>: Prep, Cook, Total and Serves.
+export const factTerms = (page: Page) => page.getByRole('term')
+
+export const factValues = (page: Page) => page.getByRole('definition')

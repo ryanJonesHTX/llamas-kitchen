@@ -6,8 +6,9 @@
 /*
   Design tokens (palette B, "Lavender field"). Components use the Tailwind
   colors below (bg-surface, text-muted, ...), never raw palette colors.
-  Dark values apply when the system is dark and the page isn't forced light
-  (data-theme="light"), or when the page is forced dark (data-theme="dark").
+  Dark values apply on screen when the system is dark and the page isn't forced
+  light (data-theme="light"), or when the page is forced dark (data-theme="dark").
+  Print always gets the light values, so a dark-mode user doesn't print a black page.
 */
 :root {
   --bg: #f7f5fa;
@@ -29,7 +30,7 @@
   --success-soft: #e4f0e3;
 }
 
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #17151c;
@@ -52,25 +53,27 @@
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #17151c;
-  --surface: #201d27;
-  --text: #ece8f1;
-  --muted: #aaa2b6;
-  --border: #322d3c;
-  --border-strong: #736a85;
-  --primary: #bba9e6;
-  --on-primary: #1d1730;
-  --primary-soft: #2f2843;
-  --on-primary-soft: #d6cbf2;
-  --accent: #a3c8a8;
-  --accent-soft: #22302a;
-  --on-accent-soft: #b9d6bc;
-  --focus: #9cc2a1;
-  --danger: #f2a097;
-  --success: #9dd3a5;
-  --success-soft: #1e3124;
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #17151c;
+    --surface: #201d27;
+    --text: #ece8f1;
+    --muted: #aaa2b6;
+    --border: #322d3c;
+    --border-strong: #736a85;
+    --primary: #bba9e6;
+    --on-primary: #1d1730;
+    --primary-soft: #2f2843;
+    --on-primary-soft: #d6cbf2;
+    --accent: #a3c8a8;
+    --accent-soft: #22302a;
+    --on-accent-soft: #b9d6bc;
+    --focus: #9cc2a1;
+    --danger: #f2a097;
+    --success: #9dd3a5;
+    --success-soft: #1e3124;
+  }
 }
 
 /* --font-inter and --font-fraunces come from next/font in app/layout.tsx. */
@@ -99,13 +102,15 @@
 
 /* `dark:` matches the same two conditions as the dark token blocks. */
 @custom-variant dark {
-  @media (prefers-color-scheme: dark) {
+  @media screen and (prefers-color-scheme: dark) {
     &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
       @slot;
     }
   }
-  &:where([data-theme="dark"], [data-theme="dark"] *) {
-    @slot;
+  @media screen {
+    &:where([data-theme="dark"], [data-theme="dark"] *) {
+      @slot;
+    }
   }
 }
 

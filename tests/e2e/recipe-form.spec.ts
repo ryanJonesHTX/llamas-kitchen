@@ -3,7 +3,7 @@ import { signInAs } from './auth.ts'
 import { deleteSessions, disconnect, findRecipe, reseed } from './db.ts'
 import { pendingRecipe, SEED_ADMIN_ID, seedRecipe } from './fixtures.ts'
 import { alertWith, fillNewRecipe, formField, imageInput, ingredientLine, newRecipe, saveButton } from './recipeForm.ts'
-import { ingredientItems, stepsList, tagItems } from './recipePage.ts'
+import { factTerms, factValues, ingredientItems, stepsList, stepTexts, tagItems } from './recipePage.ts'
 import { cloudinaryUploads, VALID_PNG } from './uploads.ts'
 
 // Admin create and edit through components/RecipeForm.tsx.
@@ -35,9 +35,11 @@ test('admin creates a recipe with an image on /new and lands on its page', async
   await expect(page.getByRole('heading', { level: 1, name: newRecipe.name })).toBeVisible()
   await expect(ingredientItems(page)).toHaveText(newRecipe.ingredients)
   await expect(stepsList(page)).toHaveJSProperty('tagName', 'OL')
-  await expect(stepsList(page).getByRole('listitem')).toHaveText(newRecipe.steps)
+  await expect(stepsList(page).getByRole('listitem')).toHaveCount(newRecipe.steps.length)
+  await expect(stepTexts(page)).toHaveText(newRecipe.steps)
   await expect(tagItems(page)).toHaveText(['pasta', 'bake'])
-  await expect(page.getByText(`Serves ${newRecipe.servings}`)).toBeVisible()
+  await expect(factTerms(page).last()).toHaveText('Serves')
+  await expect(factValues(page).last()).toHaveText(String(newRecipe.servings))
 
   const saved = await findRecipe({ slug: newRecipe.slug })
   expect(saved).toMatchObject({
