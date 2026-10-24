@@ -1,7 +1,8 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
+import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { disconnect, reseed } from './db.ts'
-import { seedRecipes } from './fixtures.ts'
+import { seedRecipe, type SeedRecipe } from './fixtures.ts'
 
 // Every page renders the same site header. Each test below runs once per
 // page; /new and the edit page are admin-only, so they run signed in as admin.
@@ -16,20 +17,14 @@ test.afterAll(async () => {
 
 type Session = 'signed out' | 'user' | 'admin'
 
-const recipe = (name: string) => {
-  const found = seedRecipes.find((r) => r.name === name)
-  if (!found) throw new Error(`No seed recipe named ${name}`)
-  return found
-}
-
-const stew = recipe('E2E Beef Stew')
+const stew = seedRecipe('E2E Beef Stew')
 
 const sitePages: { path: string; sessions: Session[] }[] = [
   { path: '/', sessions: ['signed out', 'user', 'admin'] },
   { path: '/recipes', sessions: ['signed out', 'user', 'admin'] },
-  { path: `/${stew._id}`, sessions: ['signed out', 'user', 'admin'] },
+  { path: `/recipes/${stew.slug}`, sessions: ['signed out', 'user', 'admin'] },
   { path: '/new', sessions: ['admin'] },
-  { path: `/${stew._id}/edit`, sessions: ['admin'] },
+  { path: `/recipes/${stew.slug}/edit`, sessions: ['admin'] },
 ]
 
 const emailFor = (session: Exclude<Session, 'signed out'>) =>
@@ -49,8 +44,8 @@ const visibleButton = (page: Page, name: string) =>
 const search = (page: Page) =>
   page.getByRole('combobox', { name: 'Search Recipes' })
 
-const expectRecipePage = async (page: Page, target: { _id: string; name: string }) => {
-  await expect(page).toHaveURL(`/${target._id}`)
+const expectRecipePage = async (page: Page, target: SeedRecipe) => {
+  await expect(page).toHaveURL(`/recipes/${target.slug}`)
   await expect(
     page.getByRole('heading', { level: 1, name: target.name })
   ).toBeVisible()
@@ -113,7 +108,7 @@ for (const { path, sessions } of sitePages) {
       context,
       page,
     }) => {
-      const curry = recipe('E2E Chicken Curry')
+      const curry = seedRecipe('E2E Chicken Curry')
       await startAs(context, session)
       await page.goto(path)
 
@@ -126,7 +121,7 @@ for (const { path, sessions } of sitePages) {
     })
 
     test('clicking a search option opens that recipe', async ({ context, page }) => {
-      const tacos = recipe('E2E Chicken Tacos')
+      const tacos = seedRecipe('E2E Chicken Tacos')
       await startAs(context, session)
       await page.goto(path)
 
@@ -208,6 +203,7 @@ for (const { path, sessions } of sitePages) {
   })
 }
 
+// The pending "E2E Pending Beef Pie" matches too, but is never an option.
 test('typing part of a recipe name shows matching search options and hides the rest', async ({
   page,
 }) => {

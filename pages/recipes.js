@@ -1,7 +1,6 @@
-import dbConnect from '../lib/dbConnect'
-import Recipe from '../models/Recipe'
 import { TIME_FILTERS } from '../lib/constants'
-import { publishedSearchOptions } from '../lib/searchOptions'
+import { recipeImageUrl } from '../lib/recipes/image'
+import { allPublished, publishedSearchOptions, publishedTagsInUse } from '../lib/recipes/queries'
 import SiteHeader from '../components/SiteHeader'
 import Link from 'next/link'
 import Head from 'next/head'
@@ -21,18 +20,6 @@ import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
 
 const filters = {
   time: TIME_FILTERS,
-  category: [
-    { value: 'Chicken', label: 'Chicken' },
-    { value: 'Beef', label: 'Beef' },
-    { value: 'Pork', label: 'Pork' },
-    { value: 'Seafood', label: 'Seafood' },
-    { value: 'Vegetarian', label: 'Vegetarian' },
-    { value: 'Pasta', label: 'Pasta' },
-    { value: 'Pizza', label: 'Pizza' },
-    { value: 'Holiday', label: 'Holiday' },
-    { value: 'Sweets', label: 'Sweets' },
-    { value: 'Sides', label: 'Sides' },
-  ],
 }
 const sortOptions = [
   { name: 'Newest', value: 'descending', current: true },
@@ -43,9 +30,9 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Recipes({ recipes, searchOptions }) {
+export default function Recipes({ recipes, tags, searchOptions }) {
   const [open, setOpen] = useState(false)
-  const [selectedCategories, setSelectedCategories] = useState([])
+  const [selectedTags, setSelectedTags] = useState([])
   const [selectedTimeFilter, setSelectedTimeFilter] = useState(null)
   const [filteredData, setFilteredData] = useState(recipes)
   const [sortOption, setSortOption] = useState('descending')
@@ -53,11 +40,11 @@ export default function Recipes({ recipes, searchOptions }) {
   useEffect(() => {
     applyFilterAndSort(
       filteredData,
-      selectedCategories,
+      selectedTags,
       selectedTimeFilter,
       sortOption
     )
-  }, [selectedCategories, selectedTimeFilter, sortOption, filteredData])
+  }, [selectedTags, selectedTimeFilter, sortOption, filteredData])
 
   const handleSort = (value) => {
     sortOptions.forEach((option) => {
@@ -73,15 +60,16 @@ export default function Recipes({ recipes, searchOptions }) {
 
   function applyFilterAndSort(
     filteredData,
-    selectedCategories,
+    selectedTags,
     selectedTimeFilter,
     sortOption
   ) {
     let filteredAndSortedData = filteredData
 
-    if (selectedCategories.length > 0) {
+    // A recipe matches when it has any of the selected tags.
+    if (selectedTags.length > 0) {
       filteredAndSortedData = filteredAndSortedData.filter((recipe) =>
-        selectedCategories.includes(recipe.category)
+        recipe.tags.some((tag) => selectedTags.includes(tag))
       )
     }
 
@@ -98,11 +86,11 @@ export default function Recipes({ recipes, searchOptions }) {
 
     if (sortOption === 'ascending') {
       filteredAndSortedData = filteredAndSortedData.sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        (a, b) => new Date(a.publishedAt) - new Date(b.publishedAt)
       )
     } else if (sortOption === 'descending') {
       filteredAndSortedData = filteredAndSortedData.sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
       )
     }
 
@@ -111,16 +99,16 @@ export default function Recipes({ recipes, searchOptions }) {
 
   const filteredAndSortedData = applyFilterAndSort(
     filteredData,
-    selectedCategories,
+    selectedTags,
     selectedTimeFilter,
     sortOption
   )
 
-  const handleCategoryChange = (category) => {
-    if (selectedCategories.includes(category)) {
-      setSelectedCategories(selectedCategories.filter((c) => c !== category))
+  const handleTagChange = (tag) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter((t) => t !== tag))
     } else {
-      setSelectedCategories([...selectedCategories, category])
+      setSelectedTags([...selectedTags, tag])
     }
   }
 
@@ -129,7 +117,7 @@ export default function Recipes({ recipes, searchOptions }) {
   }
 
   const handleClearFilters = () => {
-    setSelectedCategories([])
+    setSelectedTags([])
     setSelectedTimeFilter(null)
     const checkboxes = document.querySelectorAll("input[type='checkbox']")
     const radioButtons = document.querySelectorAll("input[type='radio']")
@@ -138,8 +126,8 @@ export default function Recipes({ recipes, searchOptions }) {
   }
 
   let filterCount = !selectedTimeFilter
-    ? selectedCategories.length
-    : selectedCategories.length + 1
+    ? selectedTags.length
+    : selectedTags.length + 1
 
   return (
     <div className="bg-white">
@@ -219,26 +207,26 @@ export default function Recipes({ recipes, searchOptions }) {
                   </div>
                 </fieldset>
                 <fieldset>
-                  <legend className="block font-medium">Category</legend>
+                  <legend className="block font-medium">Tags</legend>
                   <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                    {filters.category.map((option, optionIdx) => (
+                    {tags.map((tag, tagIdx) => (
                       <div
-                        key={option.value}
+                        key={tag}
                         className="flex items-center text-base sm:text-sm"
                       >
                         <input
-                          id={`category-${optionIdx}`}
-                          name="category[]"
-                          defaultValue={option.value}
+                          id={`tag-${tagIdx}`}
+                          name="tag[]"
+                          defaultValue={tag}
                           type="checkbox"
                           className="h-4 w-4 shrink-0 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          onChange={() => handleCategoryChange(option.value)}
+                          onChange={() => handleTagChange(tag)}
                         />
                         <label
-                          htmlFor={`category-${optionIdx}`}
+                          htmlFor={`tag-${tagIdx}`}
                           className="ml-3 min-w-0 flex-1 text-gray-600"
                         >
-                          {option.label}
+                          {tag}
                         </label>
                       </div>
                     ))}
@@ -319,20 +307,19 @@ export default function Recipes({ recipes, searchOptions }) {
                 className="group relative border-r border-b border-gray-200 p-4 sm:p-6"
               >
                 <div className="aspect-square overflow-hidden rounded-lg bg-gray-200 group-hover:opacity-75">
-                  <Image
-                    src={recipe.photo}
-                    alt={recipe.name}
-                    className="h-full w-full object-cover object-center"
-                    width={300}
-                    height={250}
-                  />
+                  {recipe.imageUrl && (
+                    <Image
+                      src={recipe.imageUrl}
+                      alt={recipe.name}
+                      className="h-full w-full object-cover object-center"
+                      width={300}
+                      height={250}
+                    />
+                  )}
                 </div>
                 <div className="pt-8 pb-4 text-center">
                   <h3 className="text-sm font-medium text-gray-900">
-                    <Link
-                      href="/[id]"
-                      as={`/${recipe._id}`}
-                    >
+                    <Link href={`/recipes/${recipe.slug}`}>
                       <span
                         aria-hidden="true"
                         className="absolute inset-0"
@@ -416,23 +403,20 @@ export default function Recipes({ recipes, searchOptions }) {
   )
 }
 
+// Every published recipe, as plain props, and the tags they use.
 export async function getServerSideProps() {
-  try {
-    await dbConnect()
+  const recipes = (await allPublished()).map((recipe) => ({
+    _id: String(recipe._id),
+    name: recipe.name,
+    slug: recipe.slug,
+    prepTime: recipe.prepTime,
+    cookTime: recipe.cookTime,
+    tags: recipe.tags,
+    publishedAt: recipe.publishedAt.toISOString(),
+    imageUrl: recipe.imagePublicId ? recipeImageUrl(recipe.imagePublicId, 'card') : null,
+  }))
+  const tags = await publishedTagsInUse()
+  const searchOptions = await publishedSearchOptions()
 
-    /* find all the data in our database */
-    const result = await Recipe.find({})
-    const recipes = result.map((doc) => {
-      const recipe = doc.toObject()
-      recipe._id = recipe._id.toString()
-      return JSON.parse(JSON.stringify(recipe))
-    })
-
-    const searchOptions = await publishedSearchOptions()
-
-    return { props: { recipes: recipes, searchOptions } }
-  } catch (e) {
-    console.error(e)
-    return { props: {} }
-  }
+  return { props: { recipes, tags, searchOptions } }
 }

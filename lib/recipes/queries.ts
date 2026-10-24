@@ -8,6 +8,9 @@ export type RecipeSearchOption = { name: string; href: string }
 
 const PUBLISHED = { status: 'published' } as const
 
+// Newest published first, ties broken by _id, matching the list cursor.
+const NEWEST_FIRST = { publishedAt: -1, _id: -1 } as const
+
 export async function getPublishedBySlug(slug: string): Promise<RecipeRecord | null> {
   await dbConnect()
   return Recipe.findOne({ ...PUBLISHED, slug }).lean<RecipeRecord>()
@@ -21,12 +24,17 @@ export async function getPublishedSlugById(id: string): Promise<string | null> {
   return recipe?.slug ?? null
 }
 
-// Newest published first, ties broken by _id, matching the list cursor.
 export async function latestPublished(n: number): Promise<RecipeRecord[]> {
   // Mongo reads a limit of 0 as no limit.
   if (!Number.isInteger(n) || n < 1) throw new Error(`latestPublished: n must be a positive integer, got ${n}`)
   await dbConnect()
-  return Recipe.find(PUBLISHED).sort({ publishedAt: -1, _id: -1 }).limit(n).lean<RecipeRecord[]>()
+  return Recipe.find(PUBLISHED).sort(NEWEST_FIRST).limit(n).lean<RecipeRecord[]>()
+}
+
+// Every published recipe, for the Pages recipe list until T6 pages it in the database.
+export async function allPublished(): Promise<RecipeRecord[]> {
+  await dbConnect()
+  return Recipe.find(PUBLISHED).sort(NEWEST_FIRST).lean<RecipeRecord[]>()
 }
 
 export async function publishedSearchOptions(): Promise<RecipeSearchOption[]> {

@@ -20,7 +20,8 @@ export default defineConfig({
   webServer: {
     // Requires an existing production build (`npm run build`).
     command: 'node tests/e2e/server.ts',
-    url: 'http://127.0.0.1:3100',
+    // Ready once Next answers a route that doesn't read recipes.
+    url: 'http://127.0.0.1:3100/api/auth/session',
     // Never attach to an already running server (e.g. `npm run dev`, which
     // reads .env.local and points at the production database).
     reuseExistingServer: false,

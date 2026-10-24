@@ -13,17 +13,17 @@ import {
   ComboboxOptions,
   Label,
 } from '@headlessui/react'
-import type { SearchOption } from '../lib/searchOptions'
+import type { RecipeSearchOption } from '../lib/recipes/queries'
 
 function classNames(...classes: (string | false)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
 // Filters the options by name as you type; choosing one opens its href.
-export default function RecipeSearch({ options }: { options: SearchOption[] }) {
+export default function RecipeSearch({ options }: { options: RecipeSearchOption[] }) {
   const [query, setQuery] = useState('')
   const router = useRouter()
-  const [selected, setSelected] = useState<SearchOption | null>(null)
+  const [selected, setSelected] = useState<RecipeSearchOption | null>(null)
 
   const filtered =
     query === ''
@@ -32,7 +32,7 @@ export default function RecipeSearch({ options }: { options: SearchOption[] }) {
           option.name.toLowerCase().includes(query.toLowerCase())
         )
 
-  function choose(option: SearchOption | null) {
+  function choose(option: RecipeSearchOption | null) {
     if (!option) return
     setSelected(option)
     router.push(option.href)
@@ -45,7 +45,7 @@ export default function RecipeSearch({ options }: { options: SearchOption[] }) {
         <ComboboxInput
           className="w-full rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 shadow-xs focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 sm:text-sm"
           onChange={(event) => setQuery(event.target.value)}
-          displayValue={(option: SearchOption | null) => option?.name ?? ''}
+          displayValue={(option: RecipeSearchOption | null) => option?.name ?? ''}
           placeholder="Search Recipes"
         />
         <ComboboxButton className="absolute text-gray-400 focus-within:text-gray-600 inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-hidden">

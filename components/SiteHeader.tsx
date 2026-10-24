@@ -10,7 +10,7 @@ import AuthControl from './AuthControl'
 import RecipeSearch from './RecipeSearch'
 import { isAdmin } from '../lib/roles'
 import { NAV_LINKS } from '../lib/constants'
-import type { SearchOption } from '../lib/searchOptions'
+import type { RecipeSearchOption } from '../lib/recipes/queries'
 
 const logo =
   'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp'
@@ -18,7 +18,7 @@ const logo =
 export default function SiteHeader({
   searchOptions,
 }: {
-  searchOptions: SearchOption[]
+  searchOptions: RecipeSearchOption[]
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   // Hidden while the session loads, so non-admins never see admin links.

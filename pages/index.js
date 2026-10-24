@@ -1,9 +1,8 @@
-import dbConnect from '../lib/dbConnect'
-import Recipe from '../models/Recipe'
 import Head from 'next/head'
 import LatestRecipes from '../components/LatestRecipes'
 import Landing from '../components/Landing'
-import { publishedSearchOptions } from '../lib/searchOptions'
+import { recipeImageUrl } from '../lib/recipes/image'
+import { latestPublished, publishedSearchOptions } from '../lib/recipes/queries'
 
 const Index = ({ recipes, searchOptions }) => {
   return (
@@ -17,26 +16,17 @@ const Index = ({ recipes, searchOptions }) => {
   )
 }
 
-// /* Retrieves recipe data from mongodb database */
+// The four newest published recipes, as plain props.
 export async function getServerSideProps() {
-  try {
-    await dbConnect()
+  const recipes = (await latestPublished(4)).map((recipe) => ({
+    _id: String(recipe._id),
+    name: recipe.name,
+    slug: recipe.slug,
+    imageUrl: recipe.imagePublicId ? recipeImageUrl(recipe.imagePublicId, 'card') : null,
+  }))
+  const searchOptions = await publishedSearchOptions()
 
-    /* find all the data in our database */
-    const result = await Recipe.find({})
-    const recipes = result.map((doc) => {
-      const recipe = doc.toObject()
-      recipe._id = recipe._id.toString()
-      return JSON.parse(JSON.stringify(recipe))
-    })
-
-    const searchOptions = await publishedSearchOptions()
-
-    return { props: { recipes: recipes, searchOptions } }
-  } catch (e) {
-    console.error(e)
-    return { props: {} }
-  }
+  return { props: { recipes, searchOptions } }
 }
 
 export default Index

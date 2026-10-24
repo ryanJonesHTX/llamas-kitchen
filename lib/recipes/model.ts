@@ -140,7 +140,6 @@ recipeSchema.index(
   { weights: { name: 10, 'ingredients.item': 5, tags: 3 } }
 )
 
-// Named RecipeV2 so it can't collide with models/Recipe.js; T5 renames it to Recipe when that model is deleted.
 export const Recipe =
-  (mongoose.models.RecipeV2 as mongoose.Model<RecipeRecord> | undefined) ??
-  mongoose.model<RecipeRecord>('RecipeV2', recipeSchema, 'recipes')
+  (mongoose.models.Recipe as mongoose.Model<RecipeRecord> | undefined) ??
+  mongoose.model<RecipeRecord>('Recipe', recipeSchema, 'recipes')

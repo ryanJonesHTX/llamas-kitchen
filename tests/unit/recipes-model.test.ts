@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-// The new model is imported before the old one on purpose: if both registered
-// as "Recipe" through `mongoose.models.Recipe ||`, the old import would get the new model.
+import mongoose from 'mongoose'
 import { Recipe } from '../../lib/recipes/model'
-import OldRecipe from '../../models/Recipe.js'
 import { recipeDoc, pendingDoc, rejectedDoc } from '../fixtures/recipes'
 
 // Validation rules and indexes from .claude/SCHEMA-PROPOSAL.md, checked
@@ -36,9 +34,8 @@ function withIngredient(ingredient: Doc): Doc {
 }
 
 describe('new Recipe model', () => {
-  it('is a separate model from models/Recipe.js while both are loaded', () => {
-    expect(Recipe).not.toBe(OldRecipe)
-    expect(OldRecipe.schema.path('directions')).toBeDefined()
+  it('is the model registered as Recipe, with the new schema', () => {
+    expect(mongoose.models.Recipe).toBe(Recipe)
     expect(Recipe.schema.path('directions')).toBeUndefined()
     expect(Recipe.schema.path('steps')).toBeDefined()
   })

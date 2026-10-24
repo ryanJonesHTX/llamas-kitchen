@@ -1,11 +1,10 @@
-import { expect, test, type Page, type Request } from '@playwright/test'
-import { signInAs } from './auth.ts'
+import type { Page } from '@playwright/test'
+import { expect, test } from './test.ts'
 import { disconnect, reseed } from './db.ts'
-import { seedRecipes } from './fixtures.ts'
-import { CLOUDINARY_UPLOAD_URL, uploadFields } from './uploads.ts'
+import { hiddenRecipes, publishedRecipes } from './fixtures.ts'
 
-// Every test starts from exactly the seed fixtures, so no test depends on
-// another (the add-recipe test creates data).
+// The home page and the recipe list, which show published recipes only.
+// Every test starts from exactly the seed fixtures.
 test.beforeEach(async () => {
   await reseed()
 })
@@ -13,12 +12,6 @@ test.beforeEach(async () => {
 test.afterAll(async () => {
   await disconnect()
 })
-
-const recipe = (name: string) => {
-  const found = seedRecipes.find((r) => r.name === name)
-  if (!found) throw new Error(`No seed recipe named ${name}`)
-  return found
-}
 
 // On the home page the recipe cards are the only level-3 headings.
 const latestRecipeNames = (page: Page) =>
@@ -30,6 +23,8 @@ const recipeGridNames = (page: Page) =>
     .getByRole('region', { name: 'Recipes', exact: true })
     .getByRole('heading', { level: 3 })
 
+// By publishedAt. The pending and rejected recipes were created after all of
+// these, so sorting by createdAt or skipping the status filter shows them.
 const newestFirst = [
   'E2E Pork Chops',
   'E2E Chicken Curry',
@@ -38,8 +33,18 @@ const newestFirst = [
   'E2E Beef Stew',
 ]
 
+const search = (page: Page) => page.getByRole('combobox', { name: 'Search Recipes' })
+
+// Recipe links go to /recipes/<slug>.
+async function expectSlugLinks(page: Page, names: string[]) {
+  for (const name of names) {
+    const { slug } = publishedRecipes.find((r) => r.name === name)!
+    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', `/recipes/${slug}`)
+  }
+}
+
 test.describe('home page', () => {
-  test('shows the heading and the four newest recipes, newest first', async ({
+  test('shows the heading and the four newest published recipes, newest first', async ({
     page,
   }) => {
     await page.goto('/')
@@ -64,20 +69,33 @@ test.describe('home page', () => {
       expect(name).toMatch(/^E2E /)
     }
   })
+
+  test('links each recipe to /recipes/<slug>', async ({ page }) => {
+    await page.goto('/')
+
+    await expectSlugLinks(page, newestFirst.slice(0, 4))
+  })
 })
 
 test.describe('recipe list', () => {
-  test('shows every recipe, newest first by default', async ({ page }) => {
+  test('shows every published recipe, newest first by default', async ({ page }) => {
     await page.goto('/recipes')
 
     await expect(recipeGridNames(page)).toHaveText(newestFirst)
   })
 
-  test('filters by category', async ({ page }) => {
+  test('links each recipe to /recipes/<slug>', async ({ page }) => {
+    await page.goto('/recipes')
+
+    await expectSlugLinks(page, newestFirst)
+  })
+
+  // The pending recipe is tagged beef too.
+  test('filters by tag', async ({ page }) => {
     await page.goto('/recipes')
 
     await page.getByRole('button', { name: '0 Filters' }).click()
-    await page.getByRole('checkbox', { name: 'Beef' }).check()
+    await page.getByRole('checkbox', { name: 'beef' }).check()
 
     await expect(recipeGridNames(page)).toHaveText([
       'E2E Beef Burgers',
@@ -106,14 +124,14 @@ test.describe('recipe list', () => {
   test('"Clear all" restores the full list', async ({ page }) => {
     await page.goto('/recipes')
     await page.getByRole('button', { name: '0 Filters' }).click()
-    await page.getByRole('checkbox', { name: 'Chicken' }).check()
+    await page.getByRole('checkbox', { name: 'chicken' }).check()
     await page.getByRole('radio', { name: 'Total Time: ~1 Hour' }).check()
     await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Tacos'])
 
     await page.getByRole('button', { name: 'Clear all' }).click()
 
     await expect(recipeGridNames(page)).toHaveText(newestFirst)
-    await expect(page.getByRole('checkbox', { name: 'Chicken' })).not.toBeChecked()
+    await expect(page.getByRole('checkbox', { name: 'chicken' })).not.toBeChecked()
   })
 
   test('sorts by oldest and newest', async ({ page }) => {
@@ -129,73 +147,18 @@ test.describe('recipe list', () => {
   })
 })
 
-test('recipe page shows name, ingredients and directions', async ({ page }) => {
-  const stew = recipe('E2E Beef Stew')
+for (const path of ['/', '/recipes', `/recipes/${publishedRecipes[0].slug}`]) {
+  test(`${path} shows no pending or rejected recipe, not even in the search options`, async ({ page }) => {
+    await page.goto(path)
+    for (const hidden of hiddenRecipes) {
+      await expect(page.getByText(hidden.name)).toHaveCount(0)
+    }
 
-  await page.goto(`/${stew._id}`)
+    await search(page).fill('E2E')
 
-  await expect(
-    page.getByRole('heading', { level: 1, name: stew.name })
-  ).toBeVisible()
-  await expect(page.getByRole('listitem')).toHaveText(
-    stew.ingredients.map((i) => i.ingredient)
-  )
-  await expect(page.getByText('Brown the beef.')).toBeVisible()
-  await expect(page.getByText('Simmer for two hours.')).toBeVisible()
-})
-
-test('adding a recipe shows it on the home page and its own page', async ({
-  context,
-  page,
-}) => {
-  await signInAs(context, { email: 'admin@example.com', role: 'admin' })
-  const uploadedPhoto = 'https://res.cloudinary.com/demo/image/upload/sample.jpg'
-  const uploads: Request[] = []
-  await page.route('https://api.cloudinary.com/**', (route) => {
-    uploads.push(route.request())
-    return route.fulfill({
-      json: { secure_url: uploadedPhoto, public_id: 'e2e-added-lasagna' },
-    })
+    await expect(page.getByRole('option')).toHaveCount(publishedRecipes.length)
+    for (const hidden of hiddenRecipes) {
+      await expect(page.getByRole('option', { name: hidden.name })).toHaveCount(0)
+    }
   })
-
-  await page.goto('/new')
-  // Two labels point at #name ("Recipe Name" and "Submitted By"), so match
-  // the label text exactly.
-  await page.getByLabel('Recipe Name', { exact: true }).fill('E2E Added Lasagna')
-  await page.getByLabel('Description').fill('Layered pasta bake.')
-  await page.getByLabel('Ingredients').fill('Lasagna sheets')
-  await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await expect(page.getByRole('listitem')).toContainText(['Lasagna sheets'])
-  await page.getByLabel('Directions').fill('Layer and bake.')
-  await page.getByLabel('Prep Time').fill('30')
-  await page.getByLabel('Cook Time').fill('45')
-  await page.getByLabel('Category').selectOption('Pasta')
-  await page.getByLabel('Upload an image').setInputFiles({
-    name: 'lasagna.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('not really a png'),
-  })
-  await expect(page.getByText('Image uploaded!')).toBeVisible()
-
-  // A signed upload, sent to the cloud name from the server's env.
-  expect(uploads).toHaveLength(1)
-  expect(uploads[0].method()).toBe('POST')
-  expect(uploads[0].url()).toBe(CLOUDINARY_UPLOAD_URL)
-  const fields = await uploadFields(uploads[0])
-  for (const name of ['signature', 'api_key', 'timestamp']) {
-    expect(fields.get(name), name).toBeTruthy()
-  }
-  expect(fields.has('upload_preset')).toBe(false)
-
-  await page.getByRole('button', { name: 'Submit' }).click()
-
-  await page.waitForURL('/')
-  await expect(latestRecipeNames(page).first()).toHaveText('E2E Added Lasagna')
-
-  await page.getByRole('link', { name: 'E2E Added Lasagna' }).click()
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'E2E Added Lasagna' })
-  ).toBeVisible()
-  await expect(page.getByRole('listitem')).toHaveText(['Lasagna sheets'])
-  await expect(page.getByText('Layer and bake.')).toBeVisible()
-})
+}
