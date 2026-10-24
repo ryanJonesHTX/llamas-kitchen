@@ -15,11 +15,11 @@ type SignInAs = {
 
 // Signs the browser context in without going through a provider: writes a
 // user and a database session the way @auth/mongodb-adapter stores them,
-// then hands the browser the session cookie.
+// then hands the browser the session cookie. Returns the user's id.
 export async function signInAs(
   context: BrowserContext,
   { email, name, role }: SignInAs
-): Promise<void> {
+): Promise<string> {
   const connection = await connect()
   const userId = new mongoose.Types.ObjectId()
   const sessionToken = randomUUID()
@@ -48,4 +48,5 @@ export async function signInAs(
       sameSite: 'Lax',
     },
   ])
+  return userId.toHexString()
 }

@@ -9,8 +9,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": [
@@ -31,6 +30,8 @@
     "auth.ts",
     "instrumentation.ts",
     "app/**/*.ts",
+    "**/*.tsx",
+    "components/**/*",
     "lib/**/*.ts",
     "scripts/**/*.ts",
     "types/**/*.d.ts",

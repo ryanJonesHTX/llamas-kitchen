@@ -1,0 +1,46 @@
+import type { Page } from '@playwright/test'
+
+// The recipe form (components/RecipeForm.tsx) on /new and /recipes/<slug>/edit.
+// Every field is found by its exact label; the labels are the contract.
+
+export const formField = (page: Page, label: string) => page.getByLabel(label, { exact: true })
+
+// Ingredient lines are numbered from 1: "Ingredient 1", "Ingredient 2", ...
+export const ingredientLine = (page: Page, n: number) => formField(page, `Ingredient ${n}`)
+
+export const imageInput = (page: Page) => formField(page, 'Upload an image')
+
+export const saveButton = (page: Page) => page.getByRole('button', { name: 'Save recipe', exact: true })
+
+// Upload errors are announced in an alert. Next.js has its own (empty)
+// route-announcer alert, so match on text.
+export const alertWith = (page: Page, text: RegExp) => page.getByRole('alert').filter({ hasText: text })
+
+export const newRecipe = {
+  name: 'E2E Added Lasagna',
+  slug: 'e2e-added-lasagna',
+  description: 'Layered pasta bake.',
+  ingredients: ['12 lasagna sheets', '2 cups ricotta'],
+  steps: ['Layer the sheets and sauce.', 'Bake for 45 minutes.'],
+  tags: 'Pasta, Bake',
+  servings: '6',
+  prepTime: '30',
+  cookTime: '45',
+  credit: 'Aunt Llama',
+}
+
+// Fills every field of the form on /new except the image.
+export async function fillNewRecipe(page: Page): Promise<void> {
+  await formField(page, 'Recipe name').fill(newRecipe.name)
+  await formField(page, 'Description').fill(newRecipe.description)
+  // /new starts with one empty ingredient line.
+  await ingredientLine(page, 1).fill(newRecipe.ingredients[0])
+  await page.getByRole('button', { name: 'Add ingredient', exact: true }).click()
+  await ingredientLine(page, 2).fill(newRecipe.ingredients[1])
+  await formField(page, 'Steps').fill(newRecipe.steps.join('\n'))
+  await formField(page, 'Tags').fill(newRecipe.tags)
+  await formField(page, 'Servings').fill(newRecipe.servings)
+  await formField(page, 'Prep time (minutes)').fill(newRecipe.prepTime)
+  await formField(page, 'Cook time (minutes)').fill(newRecipe.cookTime)
+  await formField(page, 'Credit').fill(newRecipe.credit)
+}

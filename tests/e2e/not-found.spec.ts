@@ -1,18 +1,20 @@
-import { expect, test } from '@playwright/test'
-import { seedRecipes } from './fixtures.ts'
+import { expect, test } from './test.ts'
 
-// Bots probe paths like /index.php, which land on pages/[id]/index.js.
-test('a recipe URL that is not a valid id responds 404', async ({ page }) => {
-  const response = await page.goto('/index.php')
+test('an unmatched URL responds 404 with the not-found page', async ({
+  page,
+}) => {
+  const response = await page.goto('/a/b/c')
 
   expect(response?.status()).toBe(404)
+  await expect(
+    page.getByRole('heading', { name: 'Page not found' })
+  ).toBeVisible()
+  await page.getByRole('link', { name: 'Go back home' }).click()
+  await expect(page).toHaveURL('/')
 })
 
-test('a valid id with no matching recipe responds 404', async ({ page }) => {
-  const missingId = '65a0000000000000000000ff'
-  expect(seedRecipes.map((r) => r._id)).not.toContain(missingId)
+test('responses do not send X-Powered-By', async ({ page }) => {
+  const response = await page.goto('/')
 
-  const response = await page.goto(`/${missingId}`)
-
-  expect(response?.status()).toBe(404)
+  expect(response?.headers()['x-powered-by']).toBeUndefined()
 })

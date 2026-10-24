@@ -1,5 +1,6 @@
-// Cloudinary can't enforce a size limit on direct uploads, so the form checks it.
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+// The form checks it for UX; uploadRecipeImage enforces it on the server.
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+export const UPLOAD_TOO_LARGE_MESSAGE = `Images must be ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB or smaller.`
 
 export const UPLOAD_FOLDER = 'recipes'
 export const ALLOWED_FORMATS = 'jpg,jpeg,png,webp,avif,heic'

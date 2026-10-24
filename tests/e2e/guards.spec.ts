@@ -1,9 +1,14 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { APIRequestContext, Browser, BrowserContext, Page } from '@playwright/test'
+import { expect, test } from './test.ts'
+import { captureNextAction, replayAction, type CapturedAction } from './actions.ts'
 import { signInAs } from './auth.ts'
-import { disconnect, reseed } from './db.ts'
-import { seedRecipes } from './fixtures.ts'
+import { countRecipes, disconnect, findRecipe, reseed } from './db.ts'
+import { seedRecipe, seedRecipes } from './fixtures.ts'
+import { fillNewRecipe, formField, imageInput, saveButton } from './recipeForm.ts'
+import { blockBrowserCloudinary, cloudinaryUploads, VALID_PNG } from './uploads.ts'
 
-// Phase 1: create, edit and delete are admin-only; reading stays public.
+// Creating and editing are admin-only, in the pages and in the server actions
+// behind them; reading stays public.
 
 test.beforeEach(async () => {
   await reseed()
@@ -13,28 +18,12 @@ test.afterAll(async () => {
   await disconnect()
 })
 
-const stew = seedRecipes[0]
-const guardedPages = ['/new', `/${stew._id}/edit`]
+const stew = seedRecipe('E2E Beef Stew')
+const guardedPages = ['/new', `/recipes/${stew.slug}/edit`]
 
-const newRecipe = {
-  name: 'E2E Guarded Lasagna',
-  description: 'Should never be saved.',
-  directions: 'Layer and bake.',
-  ingredients: [{ id: 0, ingredient: 'Lasagna sheets' }],
-  prepTime: 30,
-  cookTime: 45,
-  photo: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
-  cloudinaryId: 'e2e-guarded-lasagna',
-  category: 'Pasta',
-}
-
-const visibleButton = (page: Page, name: string) =>
-  page.getByRole('button', { name, exact: true }).filter({ visible: true })
-
-// The nav links and the Landing call-to-action ("Add Recipe →", whose arrow
+// The nav links and the home page call-to-action ("Add Recipe →", whose arrow
 // is aria-hidden) all have the accessible name "Add Recipe".
-const addRecipeLinks = (page: Page) =>
-  page.getByRole('link', { name: 'Add Recipe' })
+const addRecipeLinks = (page: Page) => page.getByRole('link', { name: 'Add Recipe' })
 
 test.describe('signed out', () => {
   for (const path of guardedPages) {
@@ -46,23 +35,6 @@ test.describe('signed out', () => {
       expect(url.searchParams.get('callbackUrl')).toBe(path)
     })
   }
-
-  test('POST /api/recipes returns 401 and saves nothing', async ({ page }) => {
-    const response = await page.request.post('/api/recipes', { data: newRecipe })
-
-    expect(response.status()).toBe(401)
-    const all = await (await page.request.get('/api/recipes')).json()
-    expect(all.data).toHaveLength(seedRecipes.length)
-  })
-
-  test('DELETE /api/recipes/<id> returns 401 and the recipe still exists', async ({
-    page,
-  }) => {
-    const response = await page.request.delete(`/api/recipes/${stew._id}`)
-
-    expect(response.status()).toBe(401)
-    expect((await page.request.get(`/api/recipes/${stew._id}`)).status()).toBe(200)
-  })
 })
 
 test.describe('signed in as user', () => {
@@ -77,70 +49,9 @@ test.describe('signed in as user', () => {
       expect(response?.status()).toBe(404)
     })
   }
-
-  test('POST /api/recipes returns 403 and saves nothing', async ({ page }) => {
-    const response = await page.request.post('/api/recipes', { data: newRecipe })
-
-    expect(response.status()).toBe(403)
-    const all = await (await page.request.get('/api/recipes')).json()
-    expect(all.data).toHaveLength(seedRecipes.length)
-  })
-
-  test('DELETE /api/recipes/<id> returns 403 and the recipe still exists', async ({
-    page,
-  }) => {
-    const response = await page.request.delete(`/api/recipes/${stew._id}`)
-
-    expect(response.status()).toBe(403)
-    expect((await page.request.get(`/api/recipes/${stew._id}`)).status()).toBe(200)
-  })
 })
 
-// Home uses components/Landing.js, /recipes uses components/Nav.js and a
-// recipe page uses components/NavNoSearch.js.
-const pagesWithNav = [
-  { nav: 'Landing', path: '/' },
-  { nav: 'Nav', path: '/recipes' },
-  { nav: 'NavNoSearch', path: `/${stew._id}` },
-]
-
-for (const { nav, path } of pagesWithNav) {
-  test(`signed out, ${nav} hides the Add Recipe link`, async ({ page }) => {
-    await page.goto(path)
-    // Wait for the session to load so the links have their final state.
-    await expect(visibleButton(page, 'Sign in')).toBeVisible()
-
-    await expect(addRecipeLinks(page)).toHaveCount(0)
-  })
-
-  test(`signed in as user, ${nav} hides the Add Recipe link`, async ({
-    context,
-    page,
-  }) => {
-    await signInAs(context, { email: 'user@example.com', role: 'user' })
-    await page.goto(path)
-    await expect(visibleButton(page, 'Sign out')).toBeVisible()
-
-    await expect(addRecipeLinks(page)).toHaveCount(0)
-  })
-
-  test(`signed in as admin, ${nav} shows the Add Recipe link`, async ({
-    context,
-    page,
-  }) => {
-    await signInAs(context, { email: 'admin@example.com', role: 'admin' })
-    await page.goto(path)
-
-    await expect(
-      addRecipeLinks(page).filter({ visible: true }).first()
-    ).toBeVisible()
-  })
-}
-
-test('signed in as admin, Landing shows the Add Recipe call-to-action', async ({
-  context,
-  page,
-}) => {
+test('signed in as admin, home page shows the Add Recipe call-to-action', async ({ context, page }) => {
   await signInAs(context, { email: 'admin@example.com', role: 'admin' })
   await page.goto('/')
 
@@ -148,27 +59,75 @@ test('signed in as admin, Landing shows the Add Recipe call-to-action', async ({
   await expect(addRecipeLinks(page).filter({ visible: true })).toHaveCount(2)
 })
 
-test('admin edits a recipe description and keeps its ingredients', async ({
-  context,
-  page,
-}) => {
-  await signInAs(context, { email: 'admin@example.com', role: 'admin' })
-  const newDescription = 'Slow cooked beef stew, now with more pepper.'
+// Server actions are public POST endpoints. Each test captures an action POST
+// an admin's browser sends (aborted, so it never runs), replays it with no
+// session and with a user session and checks nothing changed, then replays
+// it as the admin to prove the captured request does work.
+test.describe('replaying an admin server action', () => {
+  let userContext: BrowserContext
 
-  await page.goto(`/${stew._id}/edit`)
-  const description = page.getByLabel('Description')
-  await expect(description).toHaveValue(stew.description)
-  await description.fill(newDescription)
-  await page.getByRole('button', { name: 'Submit' }).click()
-  await page.waitForURL('/')
+  test.beforeEach(async ({ browser, context }) => {
+    await signInAs(context, { email: 'admin@example.com', role: 'admin' })
+    userContext = await signedInUserContext(browser)
+  })
 
-  // The recipe page does not render the description, so read it back
-  // through the public API.
-  const saved = await (await page.request.get(`/api/recipes/${stew._id}`)).json()
-  expect(saved.data.description).toBe(newDescription)
+  test.afterEach(async () => {
+    await userContext.close()
+  })
 
-  await page.goto(`/${stew._id}`)
-  await expect(page.getByRole('listitem')).toHaveText(
-    stew.ingredients.map((i) => i.ingredient)
-  )
+  // requireAdminSession throws, so both replays fail.
+  async function replayUnauthorized(request: APIRequestContext, action: CapturedAction) {
+    expect((await replayAction(request, action)).ok(), 'no session').toBe(false)
+    expect((await replayAction(userContext.request, action)).ok(), 'user session').toBe(false)
+  }
+
+  async function replayAsAdmin(page: Page, action: CapturedAction) {
+    expect((await replayAction(page.request, action)).ok()).toBe(true)
+  }
+
+  test('create, without a session or as a user, saves nothing', async ({ page, request }) => {
+    await page.goto('/new')
+    await fillNewRecipe(page)
+    const create = await captureNextAction(page, () => saveButton(page).click())
+    expect(await countRecipes()).toBe(seedRecipes.length)
+
+    await replayUnauthorized(request, create)
+    expect(await countRecipes()).toBe(seedRecipes.length)
+
+    await replayAsAdmin(page, create)
+    expect(await countRecipes()).toBe(seedRecipes.length + 1)
+  })
+
+  test('update, without a session or as a user, changes nothing', async ({ page, request }) => {
+    const description = 'Replayed description.'
+    await page.goto(`/recipes/${stew.slug}/edit`)
+    await formField(page, 'Description').fill(description)
+    const update = await captureNextAction(page, () => saveButton(page).click())
+
+    await replayUnauthorized(request, update)
+    expect((await findRecipe({ _id: stew._id }))?.description).toBe(stew.description)
+
+    await replayAsAdmin(page, update)
+    expect((await findRecipe({ _id: stew._id }))?.description).toBe(description)
+  })
+
+  test('upload, without a session or as a user, sends nothing to Cloudinary', async ({ page, request }) => {
+    await blockBrowserCloudinary(page)
+    await page.goto('/new')
+    const upload = await captureNextAction(page, () =>
+      imageInput(page).setInputFiles({ name: 'replayed.png', mimeType: 'image/png', buffer: VALID_PNG })
+    )
+
+    await replayUnauthorized(request, upload)
+    expect(cloudinaryUploads()).toEqual([])
+
+    await replayAsAdmin(page, upload)
+    expect(cloudinaryUploads().map((u) => u.file.name)).toEqual(['replayed.png'])
+  })
 })
+
+async function signedInUserContext(browser: Browser): Promise<BrowserContext> {
+  const context = await browser.newContext()
+  await signInAs(context, { email: 'user@example.com', role: 'user' })
+  return context
+}

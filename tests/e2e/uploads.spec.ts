@@ -1,111 +1,104 @@
-import { expect, test, type Page, type Request } from '@playwright/test'
+import { expect, test } from './test.ts'
 import { MAX_UPLOAD_BYTES } from '../../lib/uploads.ts'
+import { recordNextActions } from './actions.ts'
 import { signInAs } from './auth.ts'
-import { disconnect, reseed } from './db.ts'
+import { deleteSessions, disconnect, reseed } from './db.ts'
+import { alertWith, imageInput, saveButton } from './recipeForm.ts'
+import { blockBrowserCloudinary, cloudinaryUploads, releaseSlowUpload, VALID_PNG } from './uploads.ts'
 
-// Upload checks on the recipe form. Cloudinary is routed at the network
-// boundary; no test ever reaches the real API.
+// Upload rules on the recipe form. The form uploads through the
+// uploadRecipeImage server action; the server's call to Cloudinary is
+// answered by tests/e2e/fake-cloudinary.ts, never the real API.
 
-test.beforeEach(async ({ context }) => {
+let browserCloudinaryCalls: string[]
+
+test.beforeEach(async ({ context, page }) => {
   await reseed()
   await signInAs(context, { email: 'admin@example.com', role: 'admin' })
+  browserCloudinaryCalls = await blockBrowserCloudinary(page)
 })
 
 test.afterAll(async () => {
   await disconnect()
 })
 
-// Records every request to Cloudinary and answers it with `respond`.
-async function routeCloudinary(
-  page: Page,
-  respond: Parameters<Page['route']>[1]
-): Promise<Request[]> {
-  const requests: Request[] = []
-  await page.route('https://api.cloudinary.com/**', (route, request) => {
-    requests.push(request)
-    return respond(route, request)
-  })
-  return requests
-}
-
-// Upload errors are announced in an alert. Next.js has its own (empty)
-// route-announcer alert, so match on text.
-const uploadAlert = (page: Page, text: RegExp) =>
-  page.getByRole('alert').filter({ hasText: text })
-
-const uploadInput = (page: Page) => page.getByLabel('Upload an image')
-
-test('a file over 10 MB is rejected with a message and never sent to Cloudinary', async ({
+test('a file over 2 MB is rejected in the browser with the 2 MB message and never reaches the server', async ({
   page,
 }) => {
-  const requests = await routeCloudinary(page, (route) => route.abort())
   await page.goto('/new')
+  const actions = recordNextActions(page)
 
-  await uploadInput(page).setInputFiles({
+  await imageInput(page).setInputFiles({
     name: 'huge.png',
     mimeType: 'image/png',
-    buffer: Buffer.alloc(MAX_UPLOAD_BYTES + 1),
+    buffer: Buffer.concat([VALID_PNG, Buffer.alloc(MAX_UPLOAD_BYTES)]),
   })
 
-  await expect(uploadAlert(page, /10\s*MB/i)).toBeVisible()
+  await expect(alertWith(page, /\b2\s*MB/i)).toBeVisible()
   await expect(page.getByText('Image uploaded!')).toBeHidden()
-  expect(requests).toHaveLength(0)
+  expect(actions).toEqual([])
+  expect(cloudinaryUploads()).toEqual([])
 })
 
-test('a non-image file is rejected with a message and never sent to Cloudinary', async ({
+test('a non-image file named .png is rejected by the server with an error and nothing is uploaded', async ({
   page,
 }) => {
-  const requests = await routeCloudinary(page, (route) => route.abort())
   await page.goto('/new')
+  const actions = recordNextActions(page)
 
-  await uploadInput(page).setInputFiles({
-    name: 'notes.txt',
-    mimeType: 'text/plain',
-    buffer: Buffer.from('not an image'),
-  })
-
-  await expect(uploadAlert(page, /image/i)).toBeVisible()
-  await expect(page.getByText('Image uploaded!')).toBeHidden()
-  expect(requests).toHaveLength(0)
-})
-
-test('a Cloudinary error response shows an error and the image is not marked uploaded', async ({
-  page,
-}) => {
-  const requests = await routeCloudinary(page, (route) =>
-    route.fulfill({
-      status: 401,
-      json: { error: { message: 'Invalid Signature' } },
-    })
-  )
-  await page.goto('/new')
-
-  await uploadInput(page).setInputFiles({
-    name: 'lasagna.png',
+  await imageInput(page).setInputFiles({
+    name: 'notes.png',
     mimeType: 'image/png',
     buffer: Buffer.from('not really a png'),
   })
 
-  await expect(uploadAlert(page, /upload/i)).toBeVisible()
-  expect(requests).toHaveLength(1)
+  await expect(alertWith(page, /JPEG, PNG, WebP, AVIF or HEIC/)).toBeVisible()
   await expect(page.getByText('Image uploaded!')).toBeHidden()
-  await expect(uploadInput(page)).toBeAttached()
+  // It got past the browser; the server's magic-byte check rejected it.
+  expect(actions).toHaveLength(1)
+  expect(cloudinaryUploads()).toEqual([])
+  await expect(imageInput(page)).toBeAttached()
 })
 
-test('a network error reaching Cloudinary shows an error and the image is not marked uploaded', async ({
-  page,
-}) => {
-  const requests = await routeCloudinary(page, (route) => route.abort('failed'))
+test('a valid PNG is uploaded to Cloudinary by the server with a signed request', async ({ page }) => {
   await page.goto('/new')
 
-  await uploadInput(page).setInputFiles({
-    name: 'lasagna.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('not really a png'),
-  })
+  await imageInput(page).setInputFiles({ name: 'lasagna.png', mimeType: 'image/png', buffer: VALID_PNG })
 
-  await expect(uploadAlert(page, /upload/i)).toBeVisible()
-  expect(requests).toHaveLength(1)
+  await expect(page.getByText('Image uploaded!')).toBeVisible()
+  const uploads = cloudinaryUploads()
+  expect(uploads).toHaveLength(1)
+  expect(uploads[0].file).toEqual({ name: 'lasagna.png', type: 'image/png', size: VALID_PNG.length })
+  for (const name of ['signature', 'api_key', 'timestamp']) {
+    expect(uploads[0].fields[name], name).toBeTruthy()
+  }
+  expect(uploads[0].fields).not.toHaveProperty('upload_preset')
+  expect(browserCloudinaryCalls).toEqual([])
+})
+
+test('when the upload action throws (the session ended), an alert shows, nothing is uploaded and the file input is cleared', async ({
+  page,
+}) => {
+  await page.goto('/new')
+  await deleteSessions()
+
+  await imageInput(page).setInputFiles({ name: 'lasagna.png', mimeType: 'image/png', buffer: VALID_PNG })
+
+  await expect(alertWith(page, /Something went wrong/)).toBeVisible()
   await expect(page.getByText('Image uploaded!')).toBeHidden()
-  await expect(uploadInput(page)).toBeAttached()
+  await expect(imageInput(page)).toHaveValue('')
+  expect(cloudinaryUploads()).toEqual([])
+})
+
+// The fake Cloudinary holds "slow" uploads until releaseSlowUpload().
+test('Save recipe is disabled while an image upload is in progress', async ({ page }) => {
+  await page.goto('/new')
+  await expect(saveButton(page)).toBeEnabled()
+
+  await imageInput(page).setInputFiles({ name: 'slow.png', mimeType: 'image/png', buffer: VALID_PNG })
+
+  await expect(saveButton(page)).toBeDisabled()
+  releaseSlowUpload()
+  await expect(page.getByText('Image uploaded!')).toBeVisible()
+  await expect(saveButton(page)).toBeEnabled()
 })
