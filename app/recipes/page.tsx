@@ -23,7 +23,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
 
   // Invalid params 404 above, before the boundary starts streaming with a 200.
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <div className="py-12 sm:py-16">
         <h1 className="font-display text-4xl font-semibold tracking-tight text-text sm:text-5xl">Recipes</h1>
         <p className="mt-4 text-lg text-muted">Everything from the Llama's Kitchen collection.</p>
@@ -32,7 +32,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
       <Suspense fallback={<RecipeGridSkeleton />}>
         <RecipeResults query={query} />
       </Suspense>
-    </main>
+    </div>
   )
 }
 

@@ -279,6 +279,18 @@ test.describe('mobile menu', () => {
     expect((await themeCookie(context))?.value).toBe('dark')
   })
 
+  // The header copy stays compact (32px, above WCAG's 24px minimum) so the desktop header fits at 1024px.
+  test("the menu's theme buttons are 44px touch targets", async ({ page }) => {
+    await page.goto('/')
+
+    await page.getByRole('button', { name: 'Open main menu' }).click()
+    const buttons = page.getByRole('dialog').getByRole('group', { name: 'Color theme' }).getByRole('button')
+    await expect(buttons).toHaveCount(3)
+    for (const button of await buttons.all()) {
+      expect(await button.boundingBox()).toMatchObject({ width: 44, height: 44 })
+    }
+  })
+
   test('"Dark theme" stays pressed after closing and reopening the menu', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' })
     await page.goto('/')

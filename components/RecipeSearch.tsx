@@ -43,7 +43,7 @@ export default function RecipeSearch({ options }: { options: RecipeSearchOption[
       <Label className="sr-only">Search Recipes</Label>
       <div className="relative">
         <ComboboxInput
-          className="w-full rounded-md border border-border-strong bg-surface py-2 pl-3 pr-10 text-text shadow-xs focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary sm:text-sm"
+          className="min-h-11 w-full rounded-md border border-border-strong bg-surface py-2 pl-3 pr-10 text-text shadow-xs focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary sm:text-sm lg:min-h-0"
           onChange={(event) => setQuery(event.target.value)}
           displayValue={(option: RecipeSearchOption | null) => option?.name ?? ''}
           placeholder="Search Recipes"

@@ -12,10 +12,10 @@ export default async function HomePage() {
   const [session, recipes] = await Promise.all([auth(), latestPublished(4)])
   const admin = isAdmin(session)
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <Hero admin={admin} />
       <LatestRecipes recipes={recipes} admin={admin} />
-    </main>
+    </div>
   )
 }
 

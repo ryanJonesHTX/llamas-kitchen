@@ -108,13 +108,13 @@ test.describe('the ingredient checklist', () => {
     await expect(beef(page)).not.toBeChecked()
   })
 
+  // The skip link jumps past the header; the first ingredient is the next stop.
   test('Tab reaches a checkbox and Space toggles it', async ({ page }) => {
     await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
 
-    const hasFocus = () => beef(page).evaluate((el) => el === document.activeElement)
-    for (let i = 0; i < 40 && !(await hasFocus()); i++) {
-      await page.keyboard.press('Tab')
-    }
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
     await expect(beef(page)).toBeFocused()
 
     await page.keyboard.press('Space')

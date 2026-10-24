@@ -24,6 +24,8 @@ export const metadata: Metadata = {
 // auth() reads the request, so every page renders per request.
 // The theme cookie sets data-theme for light or dark; system leaves it off
 // so globals.css follows the OS setting.
+// Every page renders inside the one <main>, which the skip link targets;
+// tabIndex -1 lets the link move focus there.
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const session = await auth()
   const searchOptions = await publishedSearchOptions()
@@ -35,9 +37,17 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       data-theme={theme === 'system' ? undefined : theme}
     >
       <body className="font-sans">
+        <a
+          href="#main"
+          className="fixed top-2 left-2 z-50 -translate-y-24 rounded-md bg-surface px-4 py-3 font-semibold text-text shadow-lg focus:translate-y-0"
+        >
+          Skip to content
+        </a>
         <SessionProvider session={session}>
           <SiteHeader searchOptions={searchOptions} theme={theme} />
-          {children}
+          <main id="main" tabIndex={-1} className="focus:outline-none">
+            {children}
+          </main>
         </SessionProvider>
         <Toaster />
       </body>

@@ -173,20 +173,22 @@ for (const { path, sessions } of sitePages) {
         await expect(dialog.getByRole('button', { name: 'Close menu' })).toBeFocused()
       })
 
-      test('"Close menu" closes the menu', async ({ page }) => {
+      test('"Close menu" closes the menu and returns focus to "Open main menu"', async ({ page }) => {
         const dialog = await openMenu(page)
 
         await dialog.getByRole('button', { name: 'Close menu' }).click()
 
         await expect(page.getByRole('dialog')).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Open main menu' })).toBeFocused()
       })
 
-      test('Escape closes the menu', async ({ page }) => {
+      test('Escape closes the menu and returns focus to "Open main menu"', async ({ page }) => {
         await openMenu(page)
 
         await page.keyboard.press('Escape')
 
         await expect(page.getByRole('dialog')).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Open main menu' })).toBeFocused()
       })
 
       test(`clicking "${link}" in the menu navigates to ${target}`, async ({ page }) => {
@@ -244,4 +246,23 @@ test('typing part of a recipe name shows matching search options and hides the r
   await expect(page.getByRole('option', { name: 'E2E Beef Burgers' })).toBeVisible()
   await expect(page.getByRole('option', { name: 'E2E Chicken Tacos' })).toHaveCount(0)
   await expect(page.getByRole('option', { name: 'E2E Pork Chops' })).toHaveCount(0)
+})
+
+// The desktop header starts at 1024px (lg). The admin's extra link, a long
+// email and the compact theme toggle must still fit inside the nav's padding.
+test('at 1024px wide the header fits for an admin with a long email', async ({ context, page }) => {
+  await signInAs(context, { email: 'a-rather-long-admin-name@example.com', role: 'admin' })
+  await page.setViewportSize({ width: 1024, height: 800 })
+  await page.goto('/')
+
+  const nav = page.getByRole('navigation', { name: 'Global' })
+  const contentRight = await nav.evaluate(
+    (el) => el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight)
+  )
+  const addRecipe = (await globalNavLink(page, 'Add Recipe').boundingBox())!
+  const searchBox = (await search(page).boundingBox())!
+  const signOut = (await visibleButton(page, 'Sign out').boundingBox())!
+
+  expect(addRecipe.x + addRecipe.width).toBeLessThan(searchBox.x)
+  expect(signOut.x + signOut.width).toBeLessThanOrEqual(contentRight)
 })

@@ -10,7 +10,9 @@ import { listingHref } from '../lib/recipes/listingHref'
 // The filter and sort state the URL holds, minus the page cursor.
 type ListingState = Pick<ListingQuery, 'tags' | 'time' | 'sort'>
 
-const optionClass = 'flex items-center gap-x-3 text-base text-text sm:text-sm'
+// Rows are 44px tall on phones; the label fills the row, so all of it is tappable.
+const optionClass = 'flex min-h-11 items-center gap-x-3 text-base text-text sm:min-h-0 sm:text-sm'
+const labelClass = 'flex min-w-0 flex-1 items-center self-stretch'
 const inputClass = 'h-4 w-4 shrink-0 border-border-strong text-primary focus:ring-focus'
 
 // Checked state comes from the URL; every change navigates, which drops the cursor.
@@ -34,10 +36,11 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
       <div className="flex items-center gap-x-4 text-sm">
         <DisclosureButton
           aria-label={filterCount > 0 ? `Filters, ${filterCount} active` : undefined}
-          className="inline-flex min-h-10 items-center gap-x-2 rounded-md border border-border-strong bg-surface px-3 font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft data-open:bg-primary-soft data-open:text-on-primary-soft"
+          className="inline-flex min-h-11 items-center gap-x-2 rounded-md border border-border-strong bg-surface px-3 font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft data-open:bg-primary-soft data-open:text-on-primary-soft"
         >
           <FunnelIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Filters
+          {/* The space keeps the visible text "Filters 2", not "Filters2", so it reads as part of the name (WCAG 2.5.3). */}
+          Filters{' '}
           {filterCount > 0 && (
             <span
               aria-hidden="true"
@@ -50,14 +53,14 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
         {canClear && (
           <button
             type="button"
-            className="min-h-10 font-semibold text-accent hover:underline"
+            className="min-h-11 font-semibold text-accent hover:underline"
             onClick={() => router.push('/recipes', { scroll: false })}
           >
             Clear all
           </button>
         )}
         <Menu as="div" className="relative ml-auto">
-          <MenuButton className="group inline-flex min-h-10 items-center gap-x-1 font-semibold text-muted hover:text-text">
+          <MenuButton className="group inline-flex min-h-11 items-center gap-x-1 font-semibold text-muted hover:text-text">
             Sort: <span className="text-text">{sortLabel}</span>
             <ChevronDownIcon className="-mr-1 h-5 w-5 shrink-0 text-muted group-hover:text-text" aria-hidden="true" />
           </MenuButton>
@@ -74,7 +77,7 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
                     type="button"
                     aria-current={selected ? 'true' : undefined}
                     onClick={() => go({ ...state, sort: option.value })}
-                    className={`flex w-full items-center gap-x-2 rounded-md px-3 py-2 text-left text-sm data-focus:bg-primary-soft data-focus:text-on-primary-soft ${
+                    className={`flex min-h-11 w-full items-center gap-x-2 rounded-md px-3 py-2 text-left text-sm sm:min-h-0 data-focus:bg-primary-soft data-focus:text-on-primary-soft ${
                       selected ? 'font-semibold text-text' : 'text-muted'
                     }`}
                   >
@@ -90,7 +93,7 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
       <DisclosurePanel className="mt-4 grid gap-8 rounded-xl border border-border bg-surface p-6 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <fieldset>
           <legend className="font-semibold text-text">Ready to eat</legend>
-          <div className="mt-4 space-y-4 sm:space-y-3">
+          <div className="mt-2 sm:mt-4 sm:space-y-3">
             {TIME_FILTERS.map((option) => (
               <div key={option.value} className={optionClass}>
                 <input
@@ -102,7 +105,7 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
                   onChange={() => go({ ...state, time: option.value })}
                   className={inputClass}
                 />
-                <label htmlFor={`time-${option.value}`} className="min-w-0 flex-1">
+                <label htmlFor={`time-${option.value}`} className={labelClass}>
                   {option.label}
                 </label>
               </div>
@@ -111,7 +114,7 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
         </fieldset>
         <fieldset>
           <legend className="font-semibold text-text">Tags</legend>
-          <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 sm:gap-y-3">
+          <div className="mt-2 grid grid-cols-2 gap-x-6 sm:mt-4 sm:grid-cols-3 sm:gap-y-3">
             {tagsInUse.map((tag, tagIdx) => (
               <div key={tag} className={optionClass}>
                 <input
@@ -123,7 +126,7 @@ export default function RecipeFilters({ state, tagsInUse }: { state: ListingStat
                   onChange={() => toggleTag(tag)}
                   className={`${inputClass} rounded-sm`}
                 />
-                <label htmlFor={`tag-${tagIdx}`} className="min-w-0 flex-1 break-words">
+                <label htmlFor={`tag-${tagIdx}`} className={`${labelClass} break-words`}>
                   {tag}
                 </label>
               </div>

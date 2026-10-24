@@ -27,6 +27,8 @@ function applyTheme(value: Theme) {
 
 // Controlled: SiteHeader owns the choice, so the header and menu copies
 // agree, and the menu copy keeps it across the dialog unmounting.
+// Buttons are 44px touch targets in the mobile menu (below lg) and 32px in
+// the desktop header, which has to fit from 1024px.
 export default function ThemeToggle({
   theme,
   onChange,
@@ -54,7 +56,7 @@ export default function ThemeToggle({
             type="button"
             aria-pressed={pressed}
             onClick={() => choose(value)}
-            className={`inline-flex h-8 w-8 items-center justify-center rounded ${
+            className={`inline-flex size-11 items-center justify-center rounded lg:size-8 ${
               pressed ? 'bg-primary-soft text-on-primary-soft' : 'text-muted hover:text-text'
             }`}
           >

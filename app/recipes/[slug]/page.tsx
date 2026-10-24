@@ -27,7 +27,7 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
   ]
 
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <div className="py-10 sm:py-12 print:pt-0 print:pb-8">
         {recipe.tags.length > 0 && (
           <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-1.5">
@@ -144,7 +144,7 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
           )}
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 

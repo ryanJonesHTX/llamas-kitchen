@@ -9,7 +9,7 @@ export default function RecipeGridSkeleton() {
     <div aria-busy="true">
       <p className="sr-only">Loading recipes…</p>
       <div className="flex items-center border-b border-border pb-4">
-        <div className={`h-10 w-24 rounded-md ${BLOCK}`} />
+        <div className={`h-11 w-24 rounded-md ${BLOCK}`} />
         <div className={`ml-auto h-5 w-32 ${BLOCK}`} />
       </div>
 
