@@ -8,19 +8,24 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
 import RecipeSearch from './RecipeSearch'
+import ThemeToggle from './ThemeToggle'
 import { isAdmin } from '../lib/roles'
 import { NAV_LINKS } from '../lib/constants'
 import type { RecipeSearchOption } from '../lib/recipes/queries'
+import type { Theme } from '../lib/theme'
 
 const logo =
   'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp'
 
 export default function SiteHeader({
   searchOptions,
+  theme,
 }: {
   searchOptions: RecipeSearchOption[]
+  theme: Theme
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState(theme)
   // Hidden while the session loads, so non-admins never see admin links.
   const admin = isAdmin(useSession().data)
   const links = NAV_LINKS.filter(
@@ -70,7 +75,8 @@ export default function SiteHeader({
             <div className="hidden lg:flex lg:mr-8 lg:ml-auto">
               <RecipeSearch options={searchOptions} />
             </div>
-            <div className="hidden lg:flex lg:items-center lg:mr-8">
+            <div className="hidden lg:flex lg:items-center lg:gap-x-6 lg:mr-8">
+              <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />
               <AuthControl />
             </div>
           </nav>
@@ -113,6 +119,10 @@ export default function SiteHeader({
                   </Link>
                 ))}
                 <AuthControl mobile />
+                <div className="-mx-3 flex items-center justify-between py-2 px-3">
+                  <span className="text-base leading-7 text-muted">Theme</span>
+                  <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />
+                </div>
                 <div className="flex flex-1 px-2 lg:hidden">
                   <RecipeSearch options={searchOptions} />
                 </div>
