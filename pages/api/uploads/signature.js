@@ -1,3 +1,4 @@
+import { requireEnv } from '../../../lib/env'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { signUploadParams } from '../../../lib/uploadSignature'
 import {
@@ -5,12 +6,6 @@ import {
   UPLOAD_FOLDER,
   UPLOAD_TRANSFORMATION,
 } from '../../../lib/uploads'
-
-function requireEnv(name) {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set`)
-  return value
-}
 
 // Signs the params for a direct browser upload to Cloudinary. Admin-only.
 export default async function handler(req, res) {

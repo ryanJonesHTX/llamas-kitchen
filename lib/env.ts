@@ -19,3 +19,10 @@ export function missingEnv(
 ): string[] {
   return REQUIRED_ENV.filter((name) => !env[name])
 }
+
+// The value of a required env var; throws when it is unset or empty.
+export function requireEnv(name: (typeof REQUIRED_ENV)[number]): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is not set`)
+  return value
+}

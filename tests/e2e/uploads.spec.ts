@@ -35,7 +35,7 @@ const uploadAlert = (page: Page, text: RegExp) =>
 
 const uploadInput = (page: Page) => page.getByLabel('Upload an image')
 
-test('a file over 10 MB is rejected with a message and never sent to Cloudinary', async ({
+test('a file over 2 MB is rejected with a message and never sent to Cloudinary', async ({
   page,
 }) => {
   const requests = await routeCloudinary(page, (route) => route.abort())
@@ -47,7 +47,7 @@ test('a file over 10 MB is rejected with a message and never sent to Cloudinary'
     buffer: Buffer.alloc(MAX_UPLOAD_BYTES + 1),
   })
 
-  await expect(uploadAlert(page, /10\s*MB/i)).toBeVisible()
+  await expect(uploadAlert(page, /\b2\s*MB/i)).toBeVisible()
   await expect(page.getByText('Image uploaded!')).toBeHidden()
   expect(requests).toHaveLength(0)
 })

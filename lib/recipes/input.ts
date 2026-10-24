@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MAX_RECIPE_NAME_LENGTH, MAX_RECIPE_TAGS } from '../constants'
+import { canSlugify } from '../slugify'
 import { sourceUrlSchema } from './sourceUrl'
 
 // Forms send '' for blank fields; blank-after-trim means absent.
@@ -22,7 +23,8 @@ const requiredText = z.string().trim().min(1)
 // status, rejectionReason, publishedAt and slug. Unknown keys are stripped, so
 // the parse output is the whitelist of fields input may write.
 export const recipeInputSchema = z.object({
-  name: requiredText.max(MAX_RECIPE_NAME_LENGTH),
+  // Every recipe needs a slug made from its name.
+  name: requiredText.max(MAX_RECIPE_NAME_LENGTH).refine(canSlugify, 'needs at least one letter or number'),
   description: requiredText,
   ingredients: z
     .array(

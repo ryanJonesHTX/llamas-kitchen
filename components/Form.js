@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { mutate } from 'swr'
 import { CheckCircleIcon } from '@heroicons/react/20/solid'
-import { MAX_UPLOAD_BYTES } from '../lib/uploads'
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
 
 const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
   const router = useRouter()
@@ -144,7 +144,7 @@ const Form = ({ formId, recipeForm, forNewRecipe = true, chef }) => {
       return
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      reject('Images must be 10 MB or smaller.')
+      reject(UPLOAD_TOO_LARGE_MESSAGE)
       return
     }
 

@@ -115,6 +115,15 @@ describe('recipeInputSchema', () => {
       expect(parsed(validInput({ name: 'x'.repeat(120) })).name).toHaveLength(120)
       expectIssueOn(validInput({ name: 'x'.repeat(121) }), 'name')
     })
+
+    // Every recipe needs a slug, so a name slugify can't turn into one is invalid.
+    it.each([['🍲🍲'], ['!!!'], ['🍰 - 🍰']])('rejects the name %j, which has nothing to slug', (name) => {
+      expectIssueOn(validInput({ name }), 'name')
+    })
+
+    it.each([['Beef Stew 🍲'], ['🍰 & 🍰']])('accepts the name %j, which slugs to something', (name) => {
+      expect(parsed(validInput({ name })).name).toBe(name)
+    })
   })
 
   describe('ingredients and steps', () => {
