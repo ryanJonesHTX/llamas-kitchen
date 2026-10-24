@@ -45,12 +45,12 @@ export default function SiteHeader({
                 height={48}
               />
             </Link>
-            <h3 className="-ml-3 text-xl font-bold leading-6 text-gray-900 lg:hidden">
+            <h3 className="-ml-3 font-display text-xl font-bold leading-6 text-text lg:hidden">
               Llama's Kitchen
             </h3>
             <button
               type="button"
-              className="-m-2.5 rounded-md p-2.5 text-gray-700 lg:hidden"
+              className="-m-2.5 rounded-md p-2.5 text-muted lg:hidden"
               onClick={() => setMobileMenuOpen(true)}
             >
               <span className="sr-only">Open main menu</span>
@@ -61,7 +61,7 @@ export default function SiteHeader({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-sm font-semibold leading-6 text-gray-900"
+                  className="text-sm font-semibold leading-6 text-text"
                 >
                   {item.name}
                 </Link>
@@ -80,12 +80,12 @@ export default function SiteHeader({
             onClose={setMobileMenuOpen}
             aria-label="Main menu"
           >
-            <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
+            <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-bg px-6 py-6 lg:hidden">
               <div className="flex flex-row-reverse items-center justify-between">
                 <button
                   type="button"
                   data-autofocus
-                  className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
+                  className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-muted"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <span className="sr-only">Close menu</span>
@@ -107,7 +107,7 @@ export default function SiteHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-400/10"
+                    className="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-text hover:bg-primary-soft"
                   >
                     {item.name}
                   </Link>

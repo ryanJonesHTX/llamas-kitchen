@@ -5,16 +5,16 @@ import { signIn, signOut, useSession } from 'next-auth/react'
 const styles = {
   desktop: {
     signedIn: 'flex items-center gap-x-4',
-    user: 'text-sm text-gray-700',
-    signIn: 'text-sm font-semibold leading-6 text-gray-900',
-    signOut: 'text-sm font-semibold leading-6 text-gray-900',
+    user: 'text-sm text-muted',
+    signIn: 'text-sm font-semibold leading-6 text-text',
+    signOut: 'text-sm font-semibold leading-6 text-text',
   },
   mobile: {
     signedIn: '-mx-3 flex items-center justify-between py-2 px-3',
-    user: 'text-base leading-7 text-gray-700',
-    signOut: 'text-base font-semibold leading-7 text-gray-900',
+    user: 'text-base leading-7 text-muted',
+    signOut: 'text-base font-semibold leading-7 text-text',
     signIn:
-      '-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-400/10',
+      '-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-text hover:bg-primary-soft',
   },
 }
 

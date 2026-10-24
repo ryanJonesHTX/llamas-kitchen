@@ -64,13 +64,12 @@ const EMPTY_VALUES: RecipeFormValues = {
 const SAVE_FAILED = 'Something went wrong and the recipe was not saved. Reload the page and try again.'
 const UPLOAD_FAILED = 'Something went wrong and the image was not uploaded. Reload the page and try again.'
 
-const LABEL = 'block text-sm font-medium text-gray-700'
-const INPUT =
-  'block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm'
-const HELP = 'mt-2 text-sm text-gray-500'
-const ERROR = 'mt-2 text-sm text-red-600'
+const LABEL = 'block text-sm font-medium text-muted'
+const INPUT = 'block w-full rounded-md shadow-xs sm:text-sm'
+const HELP = 'mt-2 text-sm text-muted'
+const ERROR = 'mt-2 text-sm text-danger'
 const BUTTON =
-  'rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2'
+  'rounded-md border border-transparent bg-primary py-2 px-4 text-sm font-medium text-on-primary shadow-xs hover:bg-primary/90 focus:outline-hidden focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-bg'
 
 // Marks an input invalid and points it at its error message.
 function errorProps(id: string, error: string | undefined) {
@@ -190,16 +189,16 @@ export default function RecipeForm({
   }
 
   return (
-    <div className="overflow-hidden bg-white py-16 px-6 lg:px-8 lg:py-24">
+    <div className="overflow-hidden bg-bg py-16 px-6 lg:px-8 lg:py-24">
       <div className="relative mx-auto max-w-4xl">
         <form className="space-y-8" onSubmit={handleSubmit(save)} noValidate>
-          <div className="space-y-8 divide-y divide-gray-200">
+          <div className="space-y-8 divide-y divide-border">
             <div>
               <div>
-                <h1 className="text-lg font-medium leading-6 text-gray-900">
+                <h1 className="font-display text-lg font-medium leading-6 text-text">
                   {recipeId ? 'Edit Recipe' : 'New Recipe'}
                 </h1>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-muted">
                   {recipeId
                     ? 'Change any field and save the recipe.'
                     : 'Please fill out the form to add a new recipe.'}
@@ -270,7 +269,7 @@ export default function RecipeForm({
                           <button
                             type="button"
                             aria-label={`Remove ingredient ${n}`}
-                            className="font-semibold text-indigo-600 mx-1"
+                            className="font-semibold text-primary mx-1"
                             onClick={() => ingredients.remove(index)}
                           >
                             <span aria-hidden="true">&#x2715;</span>
@@ -355,11 +354,11 @@ export default function RecipeForm({
                 {!uploaded ? (
                   <div className="sm:col-span-6">
                     <span className={LABEL}>Photo</span>
-                    <div className="mt-1 flex justify-start rounded-md border border-gray-300 pl-3 py-2">
-                      <div className="flex text-sm text-gray-600">
+                    <div className="mt-1 flex justify-start rounded-md border border-border-strong pl-3 py-2">
+                      <div className="flex text-sm text-muted">
                         <label
                           htmlFor="file-upload"
-                          className="relative cursor-pointer rounded-md bg-white font-medium text-indigo-600 focus-within:outline-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 hover:text-indigo-500"
+                          className="relative cursor-pointer rounded-md bg-bg font-medium text-primary focus-within:outline-hidden focus-within:ring-2 focus-within:ring-focus focus-within:ring-offset-2 focus-within:ring-offset-bg hover:underline"
                         >
                           <span>Upload an image</span>
                           <input
@@ -381,13 +380,13 @@ export default function RecipeForm({
                     )}
                   </div>
                 ) : (
-                  <div className="sm:col-span-6 rounded-md bg-green-50 p-4">
+                  <div className="sm:col-span-6 rounded-md bg-success-soft p-4">
                     <div className="flex">
                       <div className="shrink-0">
-                        <CheckCircleIcon className="h-5 w-5 text-green-400" aria-hidden="true" />
+                        <CheckCircleIcon className="h-5 w-5 text-success" aria-hidden="true" />
                       </div>
                       <div className="ml-3">
-                        <p className="text-sm font-medium text-green-800">Image uploaded!</p>
+                        <p className="text-sm font-medium text-success">Image uploaded!</p>
                       </div>
                     </div>
                   </div>
@@ -416,7 +415,7 @@ export default function RecipeForm({
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-5">
+          <div className="border-t border-border pt-5">
             {errors.root?.server && (
               <p role="alert" className={ERROR}>
                 {errors.root.server.message}

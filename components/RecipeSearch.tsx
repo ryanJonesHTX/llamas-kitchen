@@ -43,12 +43,12 @@ export default function RecipeSearch({ options }: { options: RecipeSearchOption[
       <Label className="sr-only">Search Recipes</Label>
       <div className="relative mt-1">
         <ComboboxInput
-          className="w-full rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 shadow-xs focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 sm:text-sm"
+          className="w-full rounded-md border border-border-strong bg-surface py-2 pl-3 pr-10 text-text shadow-xs focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary sm:text-sm"
           onChange={(event) => setQuery(event.target.value)}
           displayValue={(option: RecipeSearchOption | null) => option?.name ?? ''}
           placeholder="Search Recipes"
         />
-        <ComboboxButton className="absolute text-gray-400 focus-within:text-gray-600 inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-hidden">
+        <ComboboxButton className="absolute text-muted focus-within:text-text inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-hidden">
           <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
         </ComboboxButton>
 
@@ -56,7 +56,7 @@ export default function RecipeSearch({ options }: { options: RecipeSearchOption[
           <ComboboxOptions
             as="ul"
             modal={false}
-            className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-hidden sm:text-sm"
+            className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-surface py-1 text-base shadow-lg ring-1 ring-border focus:outline-hidden sm:text-sm"
           >
             {filtered.map((option) => (
               <ComboboxOption
@@ -66,7 +66,7 @@ export default function RecipeSearch({ options }: { options: RecipeSearchOption[
                 className={({ focus }) =>
                   classNames(
                     'relative cursor-pointer select-none py-2 pl-3 pr-9',
-                    focus ? 'bg-indigo-600 text-white' : 'text-gray-900'
+                    focus ? 'bg-primary text-on-primary' : 'text-text'
                   )
                 }
               >
@@ -80,7 +80,7 @@ export default function RecipeSearch({ options }: { options: RecipeSearchOption[
                       <span
                         className={classNames(
                           'absolute inset-y-0 right-0 flex items-center pr-4',
-                          focus ? 'text-white' : 'text-indigo-600'
+                          focus ? 'text-on-primary' : 'text-primary'
                         )}
                       >
                         <CheckIcon className="h-5 w-5" aria-hidden="true" />
