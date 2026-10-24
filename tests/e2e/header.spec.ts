@@ -198,10 +198,38 @@ for (const { path, sessions } of sitePages) {
         await expect(
           page.getByRole('heading', { level: 1, name: h1, exact: true })
         ).toBeVisible()
+        await expect(page.getByRole('dialog')).toHaveCount(0)
       })
     })
   })
 }
+
+// The nav marks the current page's link; a recipe page counts as Recipes,
+// its edit page as neither.
+const globalNavLink = (page: Page, name: string) =>
+  page.getByRole('navigation', { name: 'Global' }).getByRole('link', { name, exact: true })
+
+for (const { path, current, other } of [
+  { path: '/', current: 'Home', other: 'Recipes' },
+  { path: '/recipes', current: 'Recipes', other: 'Home' },
+  { path: `/recipes/${stew.slug}`, current: 'Recipes', other: 'Home' },
+]) {
+  test(`on ${path} the ${current} link is the current page and ${other} is not`, async ({ page }) => {
+    await page.goto(path)
+
+    await expect(globalNavLink(page, current)).toHaveAttribute('aria-current', 'page')
+    await expect(globalNavLink(page, other)).not.toHaveAttribute('aria-current')
+  })
+}
+
+test('on an edit page neither Home nor Recipes is the current page', async ({ context, page }) => {
+  await startAs(context, 'admin')
+  await page.goto(`/recipes/${stew.slug}/edit`)
+
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(globalNavLink(page, 'Home')).not.toHaveAttribute('aria-current')
+  await expect(globalNavLink(page, 'Recipes')).not.toHaveAttribute('aria-current')
+})
 
 // The pending "E2E Pending Beef Pie" matches too, but is never an option.
 test('typing part of a recipe name shows matching search options and hides the rest', async ({

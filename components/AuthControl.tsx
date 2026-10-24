@@ -5,16 +5,16 @@ import { signIn, signOut, useSession } from 'next-auth/react'
 const styles = {
   desktop: {
     signedIn: 'flex items-center gap-x-4',
-    user: 'text-sm text-muted',
-    signIn: 'text-sm font-semibold leading-6 text-text',
-    signOut: 'text-sm font-semibold leading-6 text-text',
+    user: 'max-w-24 truncate text-sm text-muted xl:max-w-48',
+    signIn: 'whitespace-nowrap text-sm font-semibold leading-6 text-text',
+    signOut: 'shrink-0 whitespace-nowrap text-sm font-semibold leading-6 text-text',
   },
   mobile: {
-    signedIn: '-mx-3 flex items-center justify-between py-2 px-3',
-    user: 'text-base leading-7 text-muted',
-    signOut: 'text-base font-semibold leading-7 text-text',
+    signedIn: 'flex min-h-11 items-center justify-between gap-x-4',
+    user: 'truncate text-base text-muted',
+    signOut: 'min-h-11 shrink-0 text-base font-semibold text-text',
     signIn:
-      '-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-text hover:bg-primary-soft',
+      '-mx-3 flex min-h-11 w-full items-center rounded-md px-3 text-base font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft',
   },
 }
 
@@ -34,10 +34,12 @@ export default function AuthControl({ mobile = false }: { mobile?: boolean }) {
     )
   }
 
+  // Long names are truncated on narrow desktops; the title shows them in full.
+  const user = session.user.name ?? session.user.email
   return (
     <div className={style.signedIn}>
-      <span className={style.user}>
-        {session.user.name ?? session.user.email}
+      <span className={style.user} title={user ?? undefined}>
+        {user}
       </span>
       <button type="button" className={style.signOut} onClick={() => signOut()}>
         Sign out

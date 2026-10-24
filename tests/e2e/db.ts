@@ -37,6 +37,12 @@ export async function insertRecipes(recipes: SeedRecipe[]): Promise<void> {
   await Recipe.insertMany(recipes, { timestamps: false })
 }
 
+// Leaves no recipes at all, for empty-state tests.
+export async function deleteAllRecipes(): Promise<void> {
+  await connect()
+  await Recipe.deleteMany({})
+}
+
 export async function findRecipe(filter: Record<string, unknown>): Promise<RecipeRecord | null> {
   await connect()
   return Recipe.findOne(filter).lean<RecipeRecord>()

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './test.ts'
-import { disconnect, reseed } from './db.ts'
+import { signInAs } from './auth.ts'
+import { deleteAllRecipes, disconnect, reseed } from './db.ts'
 import { hiddenRecipes, publishedRecipes } from './fixtures.ts'
 
 // The home page, and the public pages showing published recipes only.
@@ -69,6 +70,23 @@ test.describe('home page', () => {
     await page.goto('/')
 
     await expectSlugLinks(page, newestFirst.slice(0, 4))
+  })
+
+  test('with no recipes, says so in place of the recipe tiles', async ({ page }) => {
+    await deleteAllRecipes()
+    await page.goto('/')
+
+    await expect(page.getByText('No recipes yet.')).toBeVisible()
+    await expect(latestRecipeNames(page)).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Add the first recipe' })).toHaveCount(0)
+  })
+
+  test('with no recipes, offers admins a link to add the first one', async ({ context, page }) => {
+    await deleteAllRecipes()
+    await signInAs(context, { email: 'admin@example.com', role: 'admin' })
+    await page.goto('/')
+
+    await expect(page.getByRole('link', { name: 'Add the first recipe' })).toHaveAttribute('href', '/new')
   })
 })
 
