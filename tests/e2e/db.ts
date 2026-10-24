@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import { Recipe, type RecipeRecord } from '../../lib/recipes/model.ts'
-import { E2E_MONGODB_DB, E2E_MONGODB_PORT, seedRecipes } from './fixtures.ts'
+import { E2E_MONGODB_DB, E2E_MONGODB_PORT, seedRecipes, type SeedRecipe } from './fixtures.ts'
 import { resetCloudinaryUploads } from './uploads.ts'
 
 // Hardcoded to the local in-memory server; never read from the environment.
@@ -29,6 +29,12 @@ export async function reseed() {
   await connection.collection(USERS_COLLECTION).deleteMany({})
   await connection.collection(SESSIONS_COLLECTION).deleteMany({})
   resetCloudinaryUploads()
+}
+
+// Adds recipes on top of the seed, for tests that need more than it holds.
+export async function insertRecipes(recipes: SeedRecipe[]): Promise<void> {
+  await connect()
+  await Recipe.insertMany(recipes, { timestamps: false })
 }
 
 export async function findRecipe(filter: Record<string, unknown>): Promise<RecipeRecord | null> {

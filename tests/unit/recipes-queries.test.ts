@@ -84,13 +84,6 @@ describe('latestPublished', () => {
   })
 })
 
-describe('allPublished', () => {
-  it('returns every published recipe newest publishedAt first, breaking ties by _id descending', async () => {
-    const recipes = await queries.allPublished()
-    expect(recipes.map((r) => r.name)).toEqual(['Date Bars', 'Beef Stew', 'Carrot Soup', 'Apple Pie'])
-  })
-})
-
 describe('publishedSearchOptions', () => {
   it('returns only a name and a /recipes/<slug> href for each published recipe', async () => {
     const options = await queries.publishedSearchOptions()
@@ -121,11 +114,6 @@ describe.each(hidden)('public queries hide a $status recipe', ({ id: hiddenId, s
 
   it('latestPublished leaves it out', async () => {
     const recipes = await queries.latestPublished(10)
-    expect(recipes.map((r) => r.name)).not.toContain(name)
-  })
-
-  it('allPublished leaves it out', async () => {
-    const recipes = await queries.allPublished()
     expect(recipes.map((r) => r.name)).not.toContain(name)
   })
 

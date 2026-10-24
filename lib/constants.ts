@@ -5,14 +5,14 @@ export const NAV_LINKS = [
 ] as const
 
 export const RECIPE_SORT_OPTIONS = [
-  { value: 'descending', label: 'Newest' },
-  { value: 'ascending', label: 'Oldest' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
 ] as const
 
 // Total time is prepTime + cookTime, in minutes.
 export const TIME_FILTERS = [
-  { value: '<=80', label: 'Total Time: ~1 Hour' },
-  { value: '>80', label: 'Total Time: > 1 Hour' },
+  { value: 'quick', label: 'Total Time: ~1 Hour' },
+  { value: 'long', label: 'Total Time: > 1 Hour' },
 ] as const
 
 export const RECIPE_PAGE_SIZE = 24

@@ -31,12 +31,6 @@ export async function latestPublished(n: number): Promise<RecipeRecord[]> {
   return Recipe.find(PUBLISHED).sort(NEWEST_FIRST).limit(n).lean<RecipeRecord[]>()
 }
 
-// Every published recipe, for the Pages recipe list until T6 pages it in the database.
-export async function allPublished(): Promise<RecipeRecord[]> {
-  await dbConnect()
-  return Recipe.find(PUBLISHED).sort(NEWEST_FIRST).lean<RecipeRecord[]>()
-}
-
 export async function publishedSearchOptions(): Promise<RecipeSearchOption[]> {
   await dbConnect()
   const recipes = await Recipe.find(PUBLISHED, { _id: 0, name: 1, slug: 1 }).lean<
