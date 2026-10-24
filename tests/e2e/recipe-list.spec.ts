@@ -30,15 +30,17 @@ const newestFirst = [
   'E2E Beef Stew',
 ]
 
+// The button says "Filters", plus a count badge once any filter is active.
 const filtersButton = (page: Page, count: number) =>
-  page.getByRole('button', { name: `${count} ${count === 1 ? 'Filter' : 'Filters'}`, exact: true })
+  page.getByRole('button', { name: count === 0 ? 'Filters' : `Filters, ${count} active`, exact: true })
 
 // The disclosure's "Clear all" is a button; the empty state's is a link.
 const clearAllButton = (page: Page) => page.getByRole('button', { name: 'Clear all', exact: true })
 const moreRecipes = (page: Page) => page.getByRole('link', { name: 'More recipes', exact: true })
 
+// The sort button shows the current sort, e.g. "Sort: Newest".
 async function sortBy(page: Page, option: 'Newest' | 'Oldest') {
-  await page.getByRole('button', { name: 'Sort' }).click()
+  await page.getByRole('button', { name: /^Sort: / }).click()
   await page.getByRole('menuitem', { name: option }).click()
 }
 
@@ -86,6 +88,58 @@ test.describe('recipe list', () => {
     await page.goto('/recipes')
 
     await expectSlugLinks(page, newestFirst)
+  })
+
+  // The card is the <article> holding the recipe's heading.
+  const card = (page: Page, name: string) =>
+    page.getByRole('article').filter({ has: page.getByRole('heading', { level: 3, name, exact: true }) })
+
+  test('each card shows the total time in hours and minutes', async ({ page }) => {
+    await page.goto('/recipes')
+
+    // 20 min prep + 120 min cook.
+    await expect(card(page, 'E2E Beef Stew')).toContainText('Total time: 2 hr 20 min')
+    // 15 + 20.
+    await expect(card(page, 'E2E Chicken Tacos')).toContainText('Total time: 35 min')
+  })
+
+  test('each card lists its tags', async ({ page }) => {
+    await page.goto('/recipes')
+
+    await expect(card(page, 'E2E Beef Stew').getByRole('listitem')).toHaveText(['beef', 'stew'])
+    await expect(card(page, 'E2E Beef Burgers').getByRole('listitem')).toHaveText(['beef'])
+  })
+
+  test('a card shows three tags and counts the rest', async ({ page }) => {
+    await insertRecipes([
+      {
+        ...seedRecipe('E2E Chicken Tacos'),
+        _id: '65c000000000000000000001',
+        name: 'E2E Many Tags',
+        slug: 'e2e-many-tags',
+        tags: ['one', 'two', 'three', 'four', 'five'],
+      },
+    ])
+    await page.goto('/recipes')
+
+    await expect(card(page, 'E2E Many Tags').getByRole('listitem')).toHaveText(['one', 'two', 'three', '+2 more tags'])
+  })
+
+  test('marks the selected sort with aria-current', async ({ page }) => {
+    await page.goto('/recipes?sort=oldest')
+
+    await page.getByRole('button', { name: 'Sort: Oldest', exact: true }).click()
+
+    await expect(page.getByRole('menuitem', { name: 'Oldest' })).toHaveAttribute('aria-current', 'true')
+    await expect(page.getByRole('menuitem', { name: 'Newest' })).not.toHaveAttribute('aria-current')
+  })
+
+  test('"Clear all" only shows once the URL holds a filter or sort', async ({ page }) => {
+    await page.goto('/recipes')
+    await expect(clearAllButton(page)).toHaveCount(0)
+
+    await page.goto('/recipes?sort=oldest')
+    await expect(clearAllButton(page)).toBeVisible()
   })
 
   // The pending recipe is tagged beef too.

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import RecipeForm, { type RecipeFormValues } from '../../../../components/RecipeForm'
 import { requireAdminPage } from '../../../../lib/adminGuard'
 import { formatIngredient } from '../../../../lib/recipes/format'
+import { recipeImageUrlPrefix } from '../../../../lib/recipes/image'
 import { getRecipeForEdit, type RecipeRecord } from '../../../../lib/recipes/queries'
 
 // The form's text fields, filled from the stored recipe. sourceUrl and
@@ -30,5 +31,11 @@ export default async function EditRecipePage({ params }: { params: Promise<{ slu
   const recipe = await getRecipeForEdit(slug)
   if (!recipe) notFound()
 
-  return <RecipeForm recipeId={recipe._id.toHexString()} initialValues={formValues(recipe)} />
+  return (
+    <RecipeForm
+      recipeId={recipe._id.toHexString()}
+      initialValues={formValues(recipe)}
+      imageUrlPrefix={recipeImageUrlPrefix('card')}
+    />
+  )
 }

@@ -8,7 +8,27 @@ export const formField = (page: Page, label: string) => page.getByLabel(label, {
 // Ingredient lines are numbered from 1: "Ingredient 1", "Ingredient 2", ...
 export const ingredientLine = (page: Page, n: number) => formField(page, `Ingredient ${n}`)
 
+// Each ingredient's drag handle, also operable from the keyboard (Space, arrows, Space).
+export const reorderHandle = (page: Page, n: number) =>
+  page.getByRole('button', { name: `Reorder ingredient ${n}`, exact: true })
+
+// The file input is "Upload an image" until the form has an image, then "Replace image".
 export const imageInput = (page: Page) => formField(page, 'Upload an image')
+
+export const replaceImageInput = (page: Page) => formField(page, 'Replace image')
+
+export const imagePreview = (page: Page) => page.getByRole('img', { name: 'Recipe photo preview', exact: true })
+
+// The image URL behind the preview. next/image serves remote images through
+// /_next/image?url=<encoded URL>; local object URLs (blob:) are used as is.
+export async function imagePreviewSource(page: Page): Promise<string> {
+  const src = await imagePreview(page).getAttribute('src')
+  if (!src) throw new Error('the image preview has no src')
+  if (src.startsWith('blob:')) return src
+  const url = new URL(src, 'http://localhost').searchParams.get('url')
+  if (!url) throw new Error(`the image preview src is not a next/image URL: ${src}`)
+  return url
+}
 
 export const saveButton = (page: Page) => page.getByRole('button', { name: 'Save recipe', exact: true })
 

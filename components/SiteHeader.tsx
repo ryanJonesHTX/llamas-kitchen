@@ -2,125 +2,150 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Dialog, DialogPanel } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
 import RecipeSearch from './RecipeSearch'
+import ThemeToggle from './ThemeToggle'
 import { isAdmin } from '../lib/roles'
 import { NAV_LINKS } from '../lib/constants'
 import type { RecipeSearchOption } from '../lib/recipes/queries'
+import type { Theme } from '../lib/theme'
 
 const logo =
   'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676184096/llama-icon_wdbpep.webp'
 
+// Recipes covers the list and recipe pages, but not edit pages; the other
+// links match their own path only.
+function isActive(href: string, pathname: string) {
+  if (href === '/recipes') {
+    return (
+      pathname === '/recipes' ||
+      (pathname.startsWith('/recipes/') && !pathname.endsWith('/edit'))
+    )
+  }
+  return pathname === href
+}
+
+// The visible wordmark names the link, so the logo is decorative.
+function Brand({ onClick }: { onClick?: () => void }) {
+  return (
+    <Link href="/" onClick={onClick} className="-m-1.5 flex shrink-0 items-center gap-x-2 rounded-md p-1.5">
+      <Image alt="" className="h-10 w-10" src={logo} width={40} height={40} />
+      <span className="whitespace-nowrap font-display text-xl font-semibold tracking-tight text-text">
+        Llama's Kitchen
+      </span>
+    </Link>
+  )
+}
+
 export default function SiteHeader({
   searchOptions,
+  theme,
 }: {
   searchOptions: RecipeSearchOption[]
+  theme: Theme
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState(theme)
+  const pathname = usePathname()
   // Hidden while the session loads, so non-admins never see admin links.
   const admin = isAdmin(useSession().data)
   const links = NAV_LINKS.filter(
     (item) => admin || !('adminOnly' in item && item.adminOnly)
-  )
+  ).map((item) => ({ ...item, active: isActive(item.href, pathname) }))
+  const closeMenu = () => setMobileMenuOpen(false)
 
   return (
-    <header className="relative px-6 pt-6 lg:pl-8 lg:pr-0">
-      <div className="mx-auto max-w-7xl">
-        <div className="lg:w-full">
-          <nav
-            className="flex items-center justify-between sm:h-10 lg:justify-start"
-            aria-label="Global"
-          >
-            <Link href="/" className="-m-1.5 p-1.5">
-              <span className="sr-only">Llama's Kitchen</span>
-              <Image
-                alt="Llama's Kitchen"
-                className="h-12 w-auto"
-                src={logo}
-                width={48}
-                height={48}
-              />
+    <header className="border-b border-border bg-surface print:hidden">
+      <nav
+        className="mx-auto flex h-16 max-w-7xl items-center gap-x-8 px-4 sm:px-6 lg:px-8 xl:gap-x-10"
+        aria-label="Global"
+      >
+        <Brand />
+        <div className="hidden h-full gap-x-6 lg:flex xl:gap-x-8">
+          {links.map((item) => (
+            <Link
+              key={item.name}
+              href={item.href}
+              aria-current={item.active ? 'page' : undefined}
+              className={`-mb-px inline-flex items-center whitespace-nowrap border-b-2 text-sm font-semibold ${
+                item.active
+                  ? 'border-primary text-text'
+                  : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              {item.name}
             </Link>
-            <h3 className="-ml-3 text-xl font-bold leading-6 text-gray-900 lg:hidden">
-              Llama's Kitchen
-            </h3>
+          ))}
+        </div>
+        <div className="ml-auto hidden items-center gap-x-4 lg:flex xl:gap-x-6">
+          <div className="w-40 xl:w-64">
+            <RecipeSearch options={searchOptions} />
+          </div>
+          <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />
+          <AuthControl />
+        </div>
+        <button
+          type="button"
+          className="-mr-2 ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-text lg:hidden"
+          onClick={() => setMobileMenuOpen(true)}
+        >
+          <span className="sr-only">Open main menu</span>
+          <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+        </button>
+      </nav>
+      <Dialog
+        as="div"
+        open={mobileMenuOpen}
+        onClose={setMobileMenuOpen}
+        aria-label="Main menu"
+      >
+        <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-surface px-4 sm:px-6 lg:hidden">
+          <div className="flex h-16 items-center justify-between border-b border-border">
+            <Brand onClick={closeMenu} />
             <button
               type="button"
-              className="-m-2.5 rounded-md p-2.5 text-gray-700 lg:hidden"
-              onClick={() => setMobileMenuOpen(true)}
+              data-autofocus
+              className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-text"
+              onClick={closeMenu}
             >
-              <span className="sr-only">Open main menu</span>
-              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+              <span className="sr-only">Close menu</span>
+              <XMarkIcon className="h-6 w-6" aria-hidden="true" />
             </button>
-            <div className="hidden lg:ml-12 lg:block lg:space-x-14">
-              {links.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="text-sm font-semibold leading-6 text-gray-900"
-                >
-                  {item.name}
-                </Link>
-              ))}
+          </div>
+          <div className="space-y-1 border-b border-border py-4">
+            {links.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={closeMenu}
+                aria-current={item.active ? 'page' : undefined}
+                className={`-mx-3 flex min-h-11 items-center rounded-md border-l-2 pl-2.5 pr-3 text-base font-semibold ${
+                  item.active
+                    ? 'border-primary bg-primary-soft text-on-primary-soft'
+                    : 'border-transparent text-muted hover:bg-primary-soft hover:text-on-primary-soft'
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+          <div className="space-y-2 py-4">
+            <AuthControl mobile />
+            <div className="flex min-h-11 items-center justify-between">
+              <span className="text-base text-muted">Theme</span>
+              <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />
             </div>
-            <div className="hidden lg:flex lg:mr-8 lg:ml-auto">
+            <div className="pt-2">
               <RecipeSearch options={searchOptions} />
             </div>
-            <div className="hidden lg:flex lg:items-center lg:mr-8">
-              <AuthControl />
-            </div>
-          </nav>
-          <Dialog
-            as="div"
-            open={mobileMenuOpen}
-            onClose={setMobileMenuOpen}
-            aria-label="Main menu"
-          >
-            <DialogPanel className="fixed inset-0 z-10 overflow-y-auto bg-white px-6 py-6 lg:hidden">
-              <div className="flex flex-row-reverse items-center justify-between">
-                <button
-                  type="button"
-                  data-autofocus
-                  className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <span className="sr-only">Close menu</span>
-                  <XMarkIcon className="h-6 w-6" aria-hidden="true" />
-                </button>
-                <Link href="/" className="-m-1.5 p-1.5">
-                  <span className="sr-only">Llama's Kitchen</span>
-                  <Image
-                    className="h-12"
-                    src={logo}
-                    alt="Llama's Kitchen"
-                    width={42}
-                    height={42}
-                  />
-                </Link>
-              </div>
-              <div className="mt-6 space-y-2">
-                {links.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-400/10"
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-                <AuthControl mobile />
-                <div className="flex flex-1 px-2 lg:hidden">
-                  <RecipeSearch options={searchOptions} />
-                </div>
-              </div>
-            </DialogPanel>
-          </Dialog>
-        </div>
-      </div>
+          </div>
+        </DialogPanel>
+      </Dialog>
     </header>
   )
 }

@@ -1,5 +1,6 @@
 import { isObjectIdOrHexString } from 'mongoose'
 import dbConnect from '../dbConnect'
+import { CARD_FIELDS, type RecipeCardRecord } from './listing'
 import { Recipe, type RecipeRecord } from './model'
 
 export type { RecipeRecord }
@@ -24,11 +25,11 @@ export async function getPublishedSlugById(id: string): Promise<string | null> {
   return recipe?.slug ?? null
 }
 
-export async function latestPublished(n: number): Promise<RecipeRecord[]> {
+export async function latestPublished(n: number): Promise<RecipeCardRecord[]> {
   // Mongo reads a limit of 0 as no limit.
   if (!Number.isInteger(n) || n < 1) throw new Error(`latestPublished: n must be a positive integer, got ${n}`)
   await dbConnect()
-  return Recipe.find(PUBLISHED).sort(NEWEST_FIRST).limit(n).lean<RecipeRecord[]>()
+  return Recipe.find(PUBLISHED, CARD_FIELDS).sort(NEWEST_FIRST).limit(n).lean<RecipeCardRecord[]>()
 }
 
 export async function publishedSearchOptions(): Promise<RecipeSearchOption[]> {

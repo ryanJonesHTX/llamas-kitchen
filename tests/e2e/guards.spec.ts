@@ -21,11 +21,19 @@ test.afterAll(async () => {
 const stew = seedRecipe('E2E Beef Stew')
 const guardedPages = ['/new', `/recipes/${stew.slug}/edit`]
 
-// The nav links and the home page call-to-action ("Add Recipe →", whose arrow
-// is aria-hidden) all have the accessible name "Add Recipe".
+// Admins get two ways to /new: the header and mobile menu nav links, named
+// "Add Recipe", and the home page hero's call-to-action, named "Add a recipe".
 const addRecipeLinks = (page: Page) => page.getByRole('link', { name: 'Add Recipe' })
+const heroAddLink = (page: Page) => page.getByRole('link', { name: 'Add a recipe', exact: true })
 
 test.describe('signed out', () => {
+  test('home page shows no Add a recipe call-to-action', async ({ page }) => {
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { level: 1, name: "Llama's Kitchen" })).toBeVisible()
+    await expect(heroAddLink(page)).toHaveCount(0)
+  })
+
   for (const path of guardedPages) {
     test(`visiting ${path} lands on the sign-in page`, async ({ page }) => {
       await page.goto(path)
@@ -42,6 +50,13 @@ test.describe('signed in as user', () => {
     await signInAs(context, { email: 'user@example.com', role: 'user' })
   })
 
+  test('home page shows no Add a recipe call-to-action', async ({ page }) => {
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { level: 1, name: "Llama's Kitchen" })).toBeVisible()
+    await expect(heroAddLink(page)).toHaveCount(0)
+  })
+
   for (const path of guardedPages) {
     test(`visiting ${path} responds 404`, async ({ page }) => {
       const response = await page.goto(path)
@@ -55,8 +70,9 @@ test('signed in as admin, home page shows the Add Recipe call-to-action', async 
   await signInAs(context, { email: 'admin@example.com', role: 'admin' })
   await page.goto('/')
 
-  // One in the desktop nav, one next to "All Recipes".
-  await expect(addRecipeLinks(page).filter({ visible: true })).toHaveCount(2)
+  // The desktop nav link, and the hero's call-to-action next to "Browse recipes".
+  await expect(addRecipeLinks(page).filter({ visible: true })).toHaveCount(1)
+  await expect(heroAddLink(page)).toHaveAttribute('href', '/new')
 })
 
 // Server actions are public POST endpoints. Each test captures an action POST

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useFieldArray, useForm, type FieldPath } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch, type FieldPath } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { CheckCircleIcon } from '@heroicons/react/20/solid'
+import { CheckCircleIcon, PhotoIcon, PlusIcon } from '@heroicons/react/20/solid'
 import {
   createRecipe,
   updateRecipe,
@@ -13,9 +14,11 @@ import {
   type SaveResult,
   type UploadResult,
 } from '../app/recipes/actions'
+import { flashCookie } from '../lib/flash'
 import { parseIngredient } from '../lib/ingredients'
 import { recipeInputSchema } from '../lib/recipes/input'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
+import { SortableIngredient, SortableIngredients } from './SortableIngredients'
 
 // The trimmed, non-blank pieces of `text`.
 function nonBlankParts(text: string, separator: string): string[] {
@@ -64,13 +67,15 @@ const EMPTY_VALUES: RecipeFormValues = {
 const SAVE_FAILED = 'Something went wrong and the recipe was not saved. Reload the page and try again.'
 const UPLOAD_FAILED = 'Something went wrong and the image was not uploaded. Reload the page and try again.'
 
-const LABEL = 'block text-sm font-medium text-gray-700'
-const INPUT =
-  'block w-full rounded-md border-gray-300 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm'
-const HELP = 'mt-2 text-sm text-gray-500'
-const ERROR = 'mt-2 text-sm text-red-600'
-const BUTTON =
-  'rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2'
+// Input colors and focus rings come from the forms-plugin overrides in styles/globals.css.
+const LABEL = 'block text-sm font-medium text-text'
+const INPUT = 'block min-h-11 w-full min-w-0 rounded-lg shadow-xs sm:text-sm'
+const HELP = 'mt-2 text-sm text-muted'
+const ERROR = 'mt-2 text-sm text-danger'
+const CARD = 'rounded-xl border border-border bg-surface p-6'
+const CARD_HEADING = 'font-display text-xl text-text text-balance'
+const SECONDARY_BUTTON =
+  'inline-flex min-h-11 items-center gap-x-2 rounded-lg border border-border-strong bg-surface px-4 text-sm font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft'
 
 // Marks an input invalid and points it at its error message.
 function errorProps(id: string, error: string | undefined) {
@@ -91,18 +96,16 @@ function Field({
   label,
   error,
   help,
-  className = 'sm:col-span-6',
   children,
 }: {
   id: string
   label: string
   error: string | undefined
   help?: string
-  className?: string
   children: ReactNode
 }) {
   return (
-    <div className={className}>
+    <div>
       <label htmlFor={id} className={LABEL}>
         {label}
       </label>
@@ -113,19 +116,43 @@ function Field({
   )
 }
 
+// One group of fields on a surface card. Not a named region: the heading is
+// enough to navigate by, and a "Steps" region would clash with the Steps label.
+function Card({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section className={CARD}>
+      <h2 id={`${id}-heading`} className={CARD_HEADING}>
+        {title}
+      </h2>
+      <div className="mt-4 space-y-6">{children}</div>
+    </section>
+  )
+}
+
+// Has the next page show "Recipe saved" (components/Toaster.tsx). Set here,
+// not in the action: a cookie set by a server action makes Next re-render this page too.
+function flashSaved() {
+  document.cookie = flashCookie('saved')
+}
+
 // Creates a recipe, or with `recipeId` edits that recipe (and its slug).
 // Images upload through the uploadRecipeImage action as soon as one is chosen.
+// `imageUrlPrefix` (recipeImageUrlPrefix) plus a public ID is the preview's Cloudinary URL.
 export default function RecipeForm({
   recipeId,
   initialValues = EMPTY_VALUES,
+  imageUrlPrefix,
 }: {
   recipeId?: string
   initialValues?: RecipeFormValues
+  imageUrlPrefix: string
 }) {
   const router = useRouter()
   const [uploaded, setUploaded] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploading, setUploading] = useState(false)
+  // The chosen file, shown while it uploads.
+  const [localPreview, setLocalPreview] = useState<string | null>(null)
   const {
     control,
     formState: { errors, isSubmitting },
@@ -138,6 +165,14 @@ export default function RecipeForm({
     defaultValues: initialValues,
   })
   const ingredients = useFieldArray({ control, name: 'ingredients' })
+  const imagePublicId = useWatch({ control, name: 'imagePublicId' })
+  const previewSrc = localPreview ?? (imagePublicId ? `${imageUrlPrefix}${imagePublicId}` : null)
+
+  // Frees each object URL once it's replaced or the form goes away.
+  useEffect(() => {
+    if (!localPreview) return
+    return () => URL.revokeObjectURL(localPreview)
+  }, [localPreview])
   // The resolver files a list-level error under root; setError files it on the list itself.
   const ingredientsError = errors.ingredients?.root?.message ?? errors.ingredients?.message
 
@@ -149,7 +184,10 @@ export default function RecipeForm({
     } catch {
       return setError('root.server', { message: SAVE_FAILED })
     }
-    if (result.ok) return router.push(`/recipes/${result.slug}`)
+    if (result.ok) {
+      flashSaved()
+      return router.push(`/recipes/${result.slug}`)
+    }
     if ('formError' in result) return setError('root.server', { message: result.formError })
     // The action's field errors are keyed by schema field, and the form uses the same names.
     Object.entries(result.fieldErrors).forEach(([field, messages], index) => {
@@ -164,13 +202,18 @@ export default function RecipeForm({
     setUploadError('')
 
     // Clearing the input lets the same file be picked again after an error.
+    // Dropping the local preview brings back the previous image, if any.
     const reject = (message: string) => {
       setUploadError(message)
+      setLocalPreview(null)
       input.value = ''
     }
 
     // The server enforces the limit too; this saves sending a file it will refuse.
     if (file.size > MAX_UPLOAD_BYTES) return reject(UPLOAD_TOO_LARGE_MESSAGE)
+
+    setUploaded(false)
+    setLocalPreview(URL.createObjectURL(file))
 
     const formData = new FormData()
     formData.set('file', file)
@@ -186,250 +229,256 @@ export default function RecipeForm({
     }
     if (!result.ok) return reject(result.error)
     setValue('imagePublicId', result.publicId)
+    setLocalPreview(null)
     setUploaded(true)
   }
 
   return (
-    <div className="overflow-hidden bg-white py-16 px-6 lg:px-8 lg:py-24">
-      <div className="relative mx-auto max-w-4xl">
-        <form className="space-y-8" onSubmit={handleSubmit(save)} noValidate>
-          <div className="space-y-8 divide-y divide-gray-200">
-            <div>
-              <div>
-                <h1 className="text-lg font-medium leading-6 text-gray-900">
-                  {recipeId ? 'Edit Recipe' : 'New Recipe'}
-                </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  {recipeId
-                    ? 'Change any field and save the recipe.'
-                    : 'Please fill out the form to add a new recipe.'}
-                </p>
-              </div>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+      <h1 className="font-display text-3xl text-text text-balance">{recipeId ? 'Edit Recipe' : 'New Recipe'}</h1>
+      <p className="mt-2 text-muted">
+        {recipeId ? 'Change any field and save the recipe.' : 'Please fill out the form to add a new recipe.'}
+      </p>
 
-              <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                <Field id="name" label="Recipe name" error={errors.name?.message}>
-                  <input
-                    id="name"
-                    type="text"
-                    className={INPUT}
-                    {...register('name')}
-                    {...errorProps('name', errors.name?.message)}
-                  />
-                </Field>
+      <form className="mt-8 space-y-6" onSubmit={handleSubmit(save)} noValidate>
+        <Card id="basics" title="Basics">
+          <Field id="name" label="Recipe name" error={errors.name?.message}>
+            <input
+              id="name"
+              type="text"
+              className={INPUT}
+              {...register('name')}
+              {...errorProps('name', errors.name?.message)}
+            />
+          </Field>
 
-                {recipeId && (
-                  <Field
-                    id="slug"
-                    label="Slug"
-                    error={errors.slug?.message}
-                    help="The recipe's address: /recipes/<slug>. Lowercase letters and numbers joined by hyphens."
-                  >
+          {recipeId && (
+            <Field
+              id="slug"
+              label="Slug"
+              error={errors.slug?.message}
+              help="The recipe's address: /recipes/<slug>. Lowercase letters and numbers joined by hyphens."
+            >
+              <input
+                id="slug"
+                type="text"
+                className={INPUT}
+                {...register('slug')}
+                {...errorProps('slug', errors.slug?.message)}
+              />
+            </Field>
+          )}
+
+          <Field
+            id="description"
+            label="Description"
+            error={errors.description?.message}
+            help="Write a brief description of the recipe"
+          >
+            <textarea
+              id="description"
+              rows={3}
+              className={INPUT}
+              {...register('description')}
+              {...errorProps('description', errors.description?.message)}
+            />
+          </Field>
+
+          <Field id="tags" label="Tags" error={errors.tags?.message} help="Separate tags with commas.">
+            <input
+              id="tags"
+              type="text"
+              className={INPUT}
+              {...register('tags')}
+              {...errorProps('tags', errors.tags?.message)}
+            />
+          </Field>
+        </Card>
+
+        <Card id="ingredients" title="Ingredients">
+          <div>
+            <SortableIngredients
+              ids={ingredients.fields.map((field) => field.id)}
+              onMove={ingredients.move}
+              labelledBy="ingredients-heading"
+            >
+              {ingredients.fields.map((field, index) => {
+                const n = index + 1
+                return (
+                  <SortableIngredient key={field.id} id={field.id} n={n} onRemove={() => ingredients.remove(index)}>
+                    <label htmlFor={`ingredient-${n}`} className="sr-only">
+                      {`Ingredient ${n}`}
+                    </label>
                     <input
-                      id="slug"
+                      id={`ingredient-${n}`}
                       type="text"
+                      placeholder="e.g. 2 cups flour"
                       className={INPUT}
-                      {...register('slug')}
-                      {...errorProps('slug', errors.slug?.message)}
+                      {...register(`ingredients.${index}.line`)}
+                      {...errorProps('ingredients', ingredientsError)}
                     />
-                  </Field>
-                )}
-
-                <Field
-                  id="description"
-                  label="Description"
-                  error={errors.description?.message}
-                  help="Write a brief description of the recipe"
-                >
-                  <textarea
-                    id="description"
-                    rows={3}
-                    className={INPUT}
-                    {...register('description')}
-                    {...errorProps('description', errors.description?.message)}
-                  />
-                </Field>
-
-                <fieldset className="sm:col-span-6">
-                  <legend className={LABEL}>Ingredients</legend>
-                  <ul role="list" className="mt-1 space-y-2">
-                    {ingredients.fields.map((field, index) => {
-                      const n = index + 1
-                      return (
-                        <li key={field.id} className="flex items-center gap-x-3">
-                          <label htmlFor={`ingredient-${n}`} className="sr-only">
-                            {`Ingredient ${n}`}
-                          </label>
-                          <input
-                            id={`ingredient-${n}`}
-                            type="text"
-                            placeholder="e.g. 2 cups flour"
-                            className={INPUT}
-                            {...register(`ingredients.${index}.line`)}
-                            {...errorProps('ingredients', ingredientsError)}
-                          />
-                          <button
-                            type="button"
-                            aria-label={`Remove ingredient ${n}`}
-                            className="font-semibold text-indigo-600 mx-1"
-                            onClick={() => ingredients.remove(index)}
-                          >
-                            <span aria-hidden="true">&#x2715;</span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                  <button type="button" className={`mt-3 ${BUTTON}`} onClick={() => ingredients.append({ line: '' })}>
-                    Add ingredient
-                  </button>
-                  <FieldError id="ingredients" error={ingredientsError} />
-                </fieldset>
-
-                <Field id="steps" label="Steps" error={errors.steps?.message} help="One step per line.">
-                  <textarea
-                    id="steps"
-                    rows={6}
-                    className={INPUT}
-                    {...register('steps')}
-                    {...errorProps('steps', errors.steps?.message)}
-                  />
-                </Field>
-
-                <Field id="tags" label="Tags" error={errors.tags?.message} help="Separate tags with commas.">
-                  <input
-                    id="tags"
-                    type="text"
-                    className={INPUT}
-                    {...register('tags')}
-                    {...errorProps('tags', errors.tags?.message)}
-                  />
-                </Field>
-
-                <Field
-                  id="servings"
-                  label="Servings"
-                  error={errors.servings?.message}
-                  className="sm:col-start-1 sm:col-span-2"
-                >
-                  <input
-                    id="servings"
-                    type="number"
-                    min={1}
-                    className={INPUT}
-                    {...register('servings')}
-                    {...errorProps('servings', errors.servings?.message)}
-                  />
-                </Field>
-                <Field
-                  id="prepTime"
-                  label="Prep time (minutes)"
-                  error={errors.prepTime?.message}
-                  className="sm:col-span-2"
-                >
-                  <input
-                    id="prepTime"
-                    type="number"
-                    min={0}
-                    className={INPUT}
-                    {...register('prepTime')}
-                    {...errorProps('prepTime', errors.prepTime?.message)}
-                  />
-                </Field>
-                <Field
-                  id="cookTime"
-                  label="Cook time (minutes)"
-                  error={errors.cookTime?.message}
-                  className="sm:col-span-2"
-                >
-                  <input
-                    id="cookTime"
-                    type="number"
-                    min={0}
-                    className={INPUT}
-                    {...register('cookTime')}
-                    {...errorProps('cookTime', errors.cookTime?.message)}
-                  />
-                </Field>
-
-                {/* Conditionally display upload/success */}
-                {!uploaded ? (
-                  <div className="sm:col-span-6">
-                    <span className={LABEL}>Photo</span>
-                    <div className="mt-1 flex justify-start rounded-md border border-gray-300 pl-3 py-2">
-                      <div className="flex text-sm text-gray-600">
-                        <label
-                          htmlFor="file-upload"
-                          className="relative cursor-pointer rounded-md bg-white font-medium text-indigo-600 focus-within:outline-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 hover:text-indigo-500"
-                        >
-                          <span>Upload an image</span>
-                          <input
-                            id="file-upload"
-                            type="file"
-                            accept="image/*"
-                            aria-describedby={uploadError ? 'file-upload-error' : undefined}
-                            onChange={handleUpload}
-                            disabled={uploading}
-                            className="sr-only"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    {uploadError && (
-                      <p id="file-upload-error" role="alert" className={ERROR}>
-                        {uploadError}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="sm:col-span-6 rounded-md bg-green-50 p-4">
-                    <div className="flex">
-                      <div className="shrink-0">
-                        <CheckCircleIcon className="h-5 w-5 text-green-400" aria-hidden="true" />
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-green-800">Image uploaded!</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <Field id="notes" label="Notes" error={errors.notes?.message} help="Tips or suggested sides.">
-                  <textarea
-                    id="notes"
-                    rows={3}
-                    className={INPUT}
-                    {...register('notes')}
-                    {...errorProps('notes', errors.notes?.message)}
-                  />
-                </Field>
-
-                <Field id="credit" label="Credit" error={errors.credit?.message}>
-                  <input
-                    id="credit"
-                    type="text"
-                    className={INPUT}
-                    {...register('credit')}
-                    {...errorProps('credit', errors.credit?.message)}
-                  />
-                </Field>
-              </div>
-            </div>
+                  </SortableIngredient>
+                )
+              })}
+            </SortableIngredients>
+            <FieldError id="ingredients" error={ingredientsError} />
+            <button
+              type="button"
+              className={`mt-4 ${SECONDARY_BUTTON}`}
+              onClick={() => ingredients.append({ line: '' })}
+            >
+              <PlusIcon className="h-5 w-5" aria-hidden="true" />
+              Add ingredient
+            </button>
           </div>
+        </Card>
 
-          <div className="border-t border-gray-200 pt-5">
-            {errors.root?.server && (
-              <p role="alert" className={ERROR}>
-                {errors.root.server.message}
+        {/* The heading is the textarea's label, so "Steps" isn't shown twice. */}
+        <section className={CARD}>
+          <h2 className={CARD_HEADING}>
+            <label htmlFor="steps">Steps</label>
+          </h2>
+          <textarea
+            id="steps"
+            rows={8}
+            className={`mt-4 ${INPUT}`}
+            {...register('steps')}
+            {...errorProps('steps', errors.steps?.message)}
+          />
+          <p className={HELP}>One step per line.</p>
+          <FieldError id="steps" error={errors.steps?.message} />
+        </section>
+
+        <Card id="times" title="Times & servings">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <Field id="prepTime" label="Prep time (minutes)" error={errors.prepTime?.message}>
+              <input
+                id="prepTime"
+                type="number"
+                min={0}
+                className={INPUT}
+                {...register('prepTime')}
+                {...errorProps('prepTime', errors.prepTime?.message)}
+              />
+            </Field>
+            <Field id="cookTime" label="Cook time (minutes)" error={errors.cookTime?.message}>
+              <input
+                id="cookTime"
+                type="number"
+                min={0}
+                className={INPUT}
+                {...register('cookTime')}
+                {...errorProps('cookTime', errors.cookTime?.message)}
+              />
+            </Field>
+            <Field id="servings" label="Servings" error={errors.servings?.message}>
+              <input
+                id="servings"
+                type="number"
+                min={1}
+                className={INPUT}
+                {...register('servings')}
+                {...errorProps('servings', errors.servings?.message)}
+              />
+            </Field>
+          </div>
+        </Card>
+
+        <Card id="photo" title="Photo">
+          <div>
+            {previewSrc && (
+              <div className="relative mb-4 aspect-4/3 w-full max-w-sm overflow-hidden rounded-lg bg-accent-soft">
+                <Image
+                  src={previewSrc}
+                  alt="Recipe photo preview"
+                  fill
+                  sizes="384px"
+                  className={`object-cover ${localPreview ? 'opacity-60' : ''}`}
+                />
+              </div>
+            )}
+            {/* The input is visually hidden; its label is the visible button. */}
+            <label
+              htmlFor="file-upload"
+              className={`${SECONDARY_BUTTON} cursor-pointer has-disabled:cursor-not-allowed has-disabled:opacity-60 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus`}
+            >
+              <PhotoIcon className="h-5 w-5" aria-hidden="true" />
+              {imagePublicId ? 'Replace image' : 'Upload an image'}
+              <input
+                id="file-upload"
+                type="file"
+                accept="image/*"
+                aria-describedby={uploadError ? 'file-upload-error' : undefined}
+                onChange={handleUpload}
+                disabled={uploading}
+                className="sr-only"
+              />
+            </label>
+            {/* Always rendered, so screen readers announce its changes. */}
+            <p role="status" className="mt-3 flex min-h-5 items-center gap-x-2 text-sm">
+              {uploading && (
+                <>
+                  <span
+                    className="h-4 w-4 rounded-full border-2 border-border-strong border-t-primary motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                  <span className="text-muted">Uploading…</span>
+                </>
+              )}
+              {uploaded && (
+                <>
+                  <CheckCircleIcon className="h-5 w-5 text-success" aria-hidden="true" />
+                  <span className="font-medium text-success">Image uploaded!</span>
+                </>
+              )}
+            </p>
+            {uploadError && (
+              <p id="file-upload-error" role="alert" className={ERROR}>
+                {uploadError}
               </p>
             )}
-            <div className="flex justify-end">
-              <button type="submit" disabled={isSubmitting || uploading} className={`ml-3 inline-flex justify-center ${BUTTON}`}>
-                Save recipe
-              </button>
-            </div>
           </div>
-        </form>
-      </div>
+        </Card>
+
+        <Card id="notes" title="Notes & credit">
+          <Field id="notes" label="Notes" error={errors.notes?.message} help="Tips or suggested sides.">
+            <textarea
+              id="notes"
+              rows={3}
+              className={INPUT}
+              {...register('notes')}
+              {...errorProps('notes', errors.notes?.message)}
+            />
+          </Field>
+
+          <Field id="credit" label="Credit" error={errors.credit?.message}>
+            <input
+              id="credit"
+              type="text"
+              className={INPUT}
+              {...register('credit')}
+              {...errorProps('credit', errors.credit?.message)}
+            />
+          </Field>
+        </Card>
+
+        <div>
+          {errors.root?.server && (
+            <p role="alert" className={ERROR}>
+              {errors.root.server.message}
+            </p>
+          )}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting || uploading}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-on-primary shadow-xs hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Save recipe
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   )
 }

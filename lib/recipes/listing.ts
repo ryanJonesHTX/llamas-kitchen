@@ -15,7 +15,7 @@ export type ListingSearchParams = Record<string, string | string[] | undefined>
 
 export type RecipeCardRecord = Pick<
   RecipeRecord,
-  '_id' | 'name' | 'slug' | 'prepTime' | 'cookTime' | 'imagePublicId'
+  '_id' | 'name' | 'slug' | 'prepTime' | 'cookTime' | 'tags' | 'imagePublicId'
 > & { publishedAt: Date }
 
 export type ListingPage = { recipes: RecipeCardRecord[]; nextCursor: string | null }
@@ -23,7 +23,8 @@ export type ListingPage = { recipes: RecipeCardRecord[]; nextCursor: string | nu
 // time=quick is a total (prepTime + cookTime) of at most this many minutes.
 const QUICK_MAX_MINUTES = 80
 
-const CARD_FIELDS = { name: 1, slug: 1, prepTime: 1, cookTime: 1, imagePublicId: 1, publishedAt: 1 } as const
+// What a RecipeCard shows; the home page's latest recipes use it too.
+export const CARD_FIELDS = { name: 1, slug: 1, prepTime: 1, cookTime: 1, tags: 1, imagePublicId: 1, publishedAt: 1 } as const
 
 const CURSOR_PAYLOAD = /^(0|[1-9]\d*)_([0-9a-f]{24})$/
 

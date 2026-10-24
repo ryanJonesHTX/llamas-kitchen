@@ -2,8 +2,20 @@ import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { deleteSessions, disconnect, findRecipe, reseed } from './db.ts'
 import { pendingRecipe, SEED_ADMIN_ID, seedRecipe } from './fixtures.ts'
-import { alertWith, fillNewRecipe, formField, imageInput, ingredientLine, newRecipe, saveButton } from './recipeForm.ts'
-import { ingredientItems, stepsList, tagItems } from './recipePage.ts'
+import {
+  alertWith,
+  fillNewRecipe,
+  formField,
+  imageInput,
+  imagePreview,
+  imagePreviewSource,
+  ingredientLine,
+  newRecipe,
+  reorderHandle,
+  replaceImageInput,
+  saveButton,
+} from './recipeForm.ts'
+import { factTerms, factValues, ingredientItems, stepsList, stepTexts, tagItems } from './recipePage.ts'
 import { cloudinaryUploads, VALID_PNG } from './uploads.ts'
 
 // Admin create and edit through components/RecipeForm.tsx.
@@ -35,9 +47,11 @@ test('admin creates a recipe with an image on /new and lands on its page', async
   await expect(page.getByRole('heading', { level: 1, name: newRecipe.name })).toBeVisible()
   await expect(ingredientItems(page)).toHaveText(newRecipe.ingredients)
   await expect(stepsList(page)).toHaveJSProperty('tagName', 'OL')
-  await expect(stepsList(page).getByRole('listitem')).toHaveText(newRecipe.steps)
+  await expect(stepsList(page).getByRole('listitem')).toHaveCount(newRecipe.steps.length)
+  await expect(stepTexts(page)).toHaveText(newRecipe.steps)
   await expect(tagItems(page)).toHaveText(['pasta', 'bake'])
-  await expect(page.getByText(`Serves ${newRecipe.servings}`)).toBeVisible()
+  await expect(factTerms(page).last()).toHaveText('Serves')
+  await expect(factValues(page).last()).toHaveText(String(newRecipe.servings))
 
   const saved = await findRecipe({ slug: newRecipe.slug })
   expect(saved).toMatchObject({
@@ -62,6 +76,41 @@ test('the Notes field on /new is saved with the new recipe', async ({ page }) =>
 
   await expect(page).toHaveURL(`/recipes/${newRecipe.slug}`)
   expect((await findRecipe({ slug: newRecipe.slug }))?.notes).toBe('Rest it for ten minutes.')
+})
+
+test('an ingredient moved with the keyboard (Space, ArrowUp twice, Space) is saved in its new place', async ({
+  page,
+}) => {
+  await page.goto('/new')
+  await fillNewRecipe(page)
+  await page.getByRole('button', { name: 'Add ingredient', exact: true }).click()
+  await ingredientLine(page, 3).fill('3 cups tomato sauce')
+
+  // Each key waits for dnd-kit's announcement: it ignores keys sent before it has measured the rows.
+  const announced = (text: string) => expect(page.getByRole('status').filter({ hasText: text })).toBeAttached()
+  await reorderHandle(page, 3).focus()
+  await page.keyboard.press('Space')
+  await announced('Picked up ingredient 3.')
+  await page.keyboard.press('ArrowUp')
+  await announced('Ingredient 3 moved to position 2.')
+  await page.keyboard.press('ArrowUp')
+  await announced('Ingredient 3 moved to position 1.')
+  await page.keyboard.press('Space')
+
+  await expect(ingredientLine(page, 1)).toHaveValue('3 cups tomato sauce')
+  await saveButton(page).click()
+
+  await expect(page).toHaveURL(`/recipes/${newRecipe.slug}`)
+  await expect(ingredientItems(page)).toHaveText(['3 cups tomato sauce', ...newRecipe.ingredients])
+})
+
+test('the edit page previews the recipe\'s current image and offers to replace it', async ({ page }) => {
+  await page.goto(`/recipes/${stew.slug}/edit`)
+
+  await expect(imagePreview(page)).toBeVisible()
+  expect(await imagePreviewSource(page)).toMatch(new RegExp(`^https://res\\.cloudinary\\.com/.+/${stew.imagePublicId}$`))
+  await expect(replaceImageInput(page)).toBeAttached()
+  await expect(imageInput(page)).toHaveCount(0)
 })
 
 // The edit changes only ingredients and the slug; every other field, shown

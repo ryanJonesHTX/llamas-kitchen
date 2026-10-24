@@ -1,7 +1,9 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from './test.ts'
 import { disconnect, reseed } from './db.ts'
 import { hiddenRecipes, seedRecipe, seedRecipes } from './fixtures.ts'
-import { ingredientItems, stepsList, tagItems } from './recipePage.ts'
+import { signInAs } from './auth.ts'
+import { factTerms, factValues, ingredientItems, stepsList, stepTexts, tagItems } from './recipePage.ts'
 
 // The public recipe page, /recipes/<slug>: published recipes only.
 
@@ -25,9 +27,11 @@ test('a published recipe shows its name, description, ingredients, steps as an o
   await expect(page.getByText(stew.description)).toBeVisible()
   await expect(ingredientItems(page)).toHaveText(['2 lb stewing beef', '3 carrots', '4 cups beef stock'])
   await expect(stepsList(page)).toHaveJSProperty('tagName', 'OL')
-  await expect(stepsList(page).getByRole('listitem')).toHaveText(stew.steps)
+  await expect(stepsList(page).getByRole('listitem')).toHaveCount(stew.steps.length)
+  await expect(stepTexts(page)).toHaveText(stew.steps)
   await expect(tagItems(page)).toHaveText(stew.tags)
-  await expect(page.getByText(`Serves ${stew.servings}`)).toBeVisible()
+  await expect(factTerms(page).last()).toHaveText('Serves')
+  await expect(factValues(page).last()).toHaveText(String(stew.servings))
   await expect(page.getByText(stew.credit!)).toBeVisible()
 })
 
@@ -66,4 +70,105 @@ test('an unknown slug responds 404', async ({ page }) => {
   const response = await page.goto(`/recipes/${unknown}`)
 
   expect(response?.status()).toBe(404)
+})
+
+test('prep, cook and total time show with units', async ({ page }) => {
+  const stew = seedRecipe('E2E Beef Stew')
+  expect([stew.prepTime, stew.cookTime]).toEqual([20, 120])
+
+  await page.goto(`/recipes/${stew.slug}`)
+
+  await expect(factTerms(page)).toHaveText(['Prep', 'Cook', 'Total', 'Serves'])
+  await expect(factValues(page)).toHaveText(['20 min', '2 hr', '2 hr 20 min', String(stew.servings)])
+})
+
+test.describe('the ingredient checklist', () => {
+  const beef = (page: Page) => page.getByRole('checkbox', { name: '2 lb stewing beef', exact: true })
+
+  test("each ingredient is a checkbox named by the ingredient's text", async ({ page }) => {
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+    const boxes = ingredientItems(page).getByRole('checkbox')
+    await expect(boxes).toHaveCount(3)
+    for (const [index, name] of ['2 lb stewing beef', '3 carrots', '4 cups beef stock'].entries()) {
+      await expect(boxes.nth(index)).toHaveAccessibleName(name)
+      await expect(boxes.nth(index)).not.toBeChecked()
+    }
+  })
+
+  test("clicking an ingredient's label checks it, and clicking again unchecks it", async ({ page }) => {
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+    const label = ingredientItems(page).getByText('2 lb stewing beef', { exact: true })
+
+    await label.click()
+    await expect(beef(page)).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: '3 carrots', exact: true })).not.toBeChecked()
+
+    await label.click()
+    await expect(beef(page)).not.toBeChecked()
+  })
+
+  // The skip link jumps past the header; the first ingredient is the next stop.
+  test('Tab reaches a checkbox and Space toggles it', async ({ page }) => {
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
+    await expect(beef(page)).toBeFocused()
+
+    await page.keyboard.press('Space')
+    await expect(beef(page)).toBeChecked()
+    await page.keyboard.press('Space')
+    await expect(beef(page)).not.toBeChecked()
+  })
+})
+
+test('printing hides the site header and checkboxes, keeps ingredients and steps, and uses light colors in dark mode', async ({
+  context,
+  page,
+}) => {
+  const stew = seedRecipe('E2E Beef Stew')
+  await context.addCookies([{ name: 'theme', value: 'dark', url: 'http://127.0.0.1:3100' }])
+  await page.emulateMedia({ media: 'print' })
+
+  await page.goto(`/recipes/${stew.slug}`)
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(page.getByRole('banner')).toBeHidden()
+  await expect(ingredientItems(page)).toHaveText(['2 lb stewing beef', '3 carrots', '4 cups beef stock'])
+  await expect(ingredientItems(page).first()).toBeVisible()
+  await expect(ingredientItems(page).getByRole('checkbox').first()).toBeHidden()
+  await expect(stepTexts(page)).toHaveText(stew.steps)
+  await expect(stepTexts(page).first()).toBeVisible()
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(247, 245, 250)')
+})
+
+test.describe('the Edit link', () => {
+  const editLink = (page: Page) => page.getByRole('link', { name: 'Edit', exact: true })
+
+  test('an admin sees Edit, linking to the edit page', async ({ context, page }) => {
+    const stew = seedRecipe('E2E Beef Stew')
+    await signInAs(context, { email: 'e2e-admin@example.com', role: 'admin' })
+
+    await page.goto(`/recipes/${stew.slug}`)
+
+    await expect(editLink(page)).toHaveAttribute('href', `/recipes/${stew.slug}/edit`)
+  })
+
+  test('a signed-in non-admin sees no Edit', async ({ context, page }) => {
+    await signInAs(context, { email: 'e2e-user@example.com', role: 'user' })
+
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(editLink(page)).toHaveCount(0)
+  })
+
+  test('a signed-out visitor sees no Edit', async ({ page }) => {
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(editLink(page)).toHaveCount(0)
+  })
 })
