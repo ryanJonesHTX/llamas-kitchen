@@ -3,7 +3,7 @@
 export type RecipeImageSize = 'card' | 'hero' | 'og'
 
 const TRANSFORMATIONS: Record<RecipeImageSize, string> = {
-  card: 'c_fill,w_600,h_500',
+  card: 'c_fill,g_auto,w_800,h_600',
   hero: 'c_limit,w_1400',
   og: 'c_fill,w_1200,h_630',
 }

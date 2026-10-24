@@ -274,9 +274,16 @@ describe('listPublished', () => {
   it('returns only the fields a recipe card needs', async () => {
     const { recipes } = await listing.listPublished(query({ sort: 'oldest' }), 1)
     expect(Object.keys(recipes[0]).sort()).toEqual(
-      ['_id', 'cookTime', 'imagePublicId', 'name', 'prepTime', 'publishedAt', 'slug'].sort()
+      ['_id', 'cookTime', 'imagePublicId', 'name', 'prepTime', 'publishedAt', 'slug', 'tags'].sort()
     )
-    expect(recipes[0]).toMatchObject({ name: 'Apple', slug: 'apple', prepTime: 40, cookTime: 40, imagePublicId: 'recipes/apple' })
+    expect(recipes[0]).toMatchObject({
+      name: 'Apple',
+      slug: 'apple',
+      prepTime: 40,
+      cookTime: 40,
+      tags: ['beef'],
+      imagePublicId: 'recipes/apple',
+    })
   })
 
   describe('paging through every page yields every match exactly once, in order', () => {

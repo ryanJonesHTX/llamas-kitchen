@@ -1,8 +1,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { auth } from '../auth'
-import { recipeImageUrl } from '../lib/recipes/image'
-import { latestPublished, type RecipeRecord } from '../lib/recipes/queries'
+import RecipeCard from '../components/RecipeCard'
+import type { RecipeCardRecord } from '../lib/recipes/listing'
+import { latestPublished } from '../lib/recipes/queries'
 import { isAdmin } from '../lib/roles'
 
 const heroImage = 'https://res.cloudinary.com/dhcbfbegu/image/upload/v1676182454/llama_rmoylj.webp'
@@ -64,7 +65,7 @@ function Hero({ admin }: { admin: boolean }) {
 }
 
 // `recipes` arrive newest first, already limited to the latest few.
-function LatestRecipes({ recipes, admin }: { recipes: RecipeRecord[]; admin: boolean }) {
+function LatestRecipes({ recipes, admin }: { recipes: RecipeCardRecord[]; admin: boolean }) {
   return (
     <section aria-labelledby="latest-heading" className="border-t border-border pt-12 sm:pt-16">
       <div className="flex items-baseline justify-between gap-x-4">
@@ -89,27 +90,9 @@ function LatestRecipes({ recipes, admin }: { recipes: RecipeRecord[]; admin: boo
           )}
         </div>
       ) : (
-        <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 md:grid-cols-4 lg:gap-x-8">
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {recipes.map((recipe) => (
-            <div key={String(recipe._id)} className="group relative">
-              <div className="h-56 w-full overflow-hidden rounded-md bg-border group-hover:opacity-75 lg:h-72 xl:h-80">
-                {recipe.imagePublicId && (
-                  <Image
-                    src={recipeImageUrl(recipe.imagePublicId, 'card')}
-                    alt={recipe.name}
-                    className="h-full w-full object-cover object-center"
-                    width={300}
-                    height={250}
-                  />
-                )}
-              </div>
-              <h3 className="mt-4 font-display text-sm text-muted">
-                <Link href={`/recipes/${recipe.slug}`}>
-                  <span className="absolute inset-0" />
-                  {recipe.name}
-                </Link>
-              </h3>
-            </div>
+            <RecipeCard key={String(recipe._id)} recipe={recipe} />
           ))}
         </div>
       )}

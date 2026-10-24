@@ -78,6 +78,14 @@ describe('latestPublished', () => {
     expect(recipes.map((r) => r.name)).toEqual(['Date Bars', 'Beef Stew'])
   })
 
+  it('returns only the fields a recipe card needs', async () => {
+    const [recipe] = await queries.latestPublished(1)
+    expect(Object.keys(recipe).sort()).toEqual(
+      ['_id', 'cookTime', 'name', 'prepTime', 'publishedAt', 'slug', 'tags'].sort()
+    )
+    expect(recipe).toMatchObject({ name: 'Date Bars', prepTime: 20, cookTime: 120, tags: ['dessert'] })
+  })
+
   // Mongo reads limit(0) as no limit, so anything but a positive integer must fail fast.
   it.each([[0], [-1], [1.5]])('rejects n = %j', async (n) => {
     await expect(queries.latestPublished(n)).rejects.toThrow()
