@@ -1,9 +1,8 @@
 import { notFound } from 'next/navigation'
 import RecipeForm, { type RecipeFormValues } from '../../../../components/RecipeForm'
-import SiteHeader from '../../../../components/SiteHeader'
 import { requireAdminPage } from '../../../../lib/adminGuard'
 import { formatIngredient } from '../../../../lib/recipes/format'
-import { getRecipeForEdit, publishedSearchOptions, type RecipeRecord } from '../../../../lib/recipes/queries'
+import { getRecipeForEdit, type RecipeRecord } from '../../../../lib/recipes/queries'
 
 // The form's text fields, filled from the stored recipe. sourceUrl and
 // imagePublicId have no text field; carrying them through keeps an edit from unsetting them.
@@ -31,10 +30,5 @@ export default async function EditRecipePage({ params }: { params: Promise<{ slu
   const recipe = await getRecipeForEdit(slug)
   if (!recipe) notFound()
 
-  return (
-    <>
-      <SiteHeader searchOptions={await publishedSearchOptions()} />
-      <RecipeForm recipeId={recipe._id.toHexString()} initialValues={formValues(recipe)} />
-    </>
-  )
+  return <RecipeForm recipeId={recipe._id.toHexString()} initialValues={formValues(recipe)} />
 }

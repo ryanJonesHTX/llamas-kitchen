@@ -3,25 +3,19 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import RecipeCard from '../../components/RecipeCard'
 import RecipeFilters from '../../components/RecipeFilters'
-import SiteHeader from '../../components/SiteHeader'
 import { listPublished, parseListingParams, type ListingSearchParams } from '../../lib/recipes/listing'
 import { listingHref } from '../../lib/recipes/listingHref'
-import { publishedSearchOptions, publishedTagsInUse } from '../../lib/recipes/queries'
+import { publishedTagsInUse } from '../../lib/recipes/queries'
 
 export const metadata: Metadata = { title: 'Llamas Kitchen - Recipes' }
 
 export default async function RecipesPage({ searchParams }: { searchParams: Promise<ListingSearchParams> }) {
   const query = parseListingParams(await searchParams)
   if (!query) notFound()
-  const [{ recipes, nextCursor }, tagsInUse, searchOptions] = await Promise.all([
-    listPublished(query),
-    publishedTagsInUse(),
-    publishedSearchOptions(),
-  ])
+  const [{ recipes, nextCursor }, tagsInUse] = await Promise.all([listPublished(query), publishedTagsInUse()])
 
   return (
     <div className="bg-white">
-      <SiteHeader searchOptions={searchOptions} />
       <main className="pb-24">
         <div className="py-16 px-4 text-center sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">Recipes</h1>

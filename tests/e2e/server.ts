@@ -35,7 +35,6 @@ const e2eEnv = {
   MONGODB_URI: E2E_MONGODB_URI,
   AUTH_SECRET: 'e2e-test-secret-not-for-production',
   AUTH_URL: `http://127.0.0.1:${APP_PORT}`,
-  AUTH_TRUST_HOST: 'true',
   AUTH_GITHUB_ID: 'e2e-fake-github-id',
   AUTH_GITHUB_SECRET: 'e2e-fake-github-secret',
   AUTH_RESEND_KEY: 'e2e-fake-resend-key',

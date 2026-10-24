@@ -21,7 +21,7 @@ test.afterAll(async () => {
 const stew = seedRecipe('E2E Beef Stew')
 const guardedPages = ['/new', `/recipes/${stew.slug}/edit`]
 
-// The nav links and the Landing call-to-action ("Add Recipe →", whose arrow
+// The nav links and the home page call-to-action ("Add Recipe →", whose arrow
 // is aria-hidden) all have the accessible name "Add Recipe".
 const addRecipeLinks = (page: Page) => page.getByRole('link', { name: 'Add Recipe' })
 
@@ -51,7 +51,7 @@ test.describe('signed in as user', () => {
   }
 })
 
-test('signed in as admin, Landing shows the Add Recipe call-to-action', async ({ context, page }) => {
+test('signed in as admin, home page shows the Add Recipe call-to-action', async ({ context, page }) => {
   await signInAs(context, { email: 'admin@example.com', role: 'admin' })
   await page.goto('/')
 

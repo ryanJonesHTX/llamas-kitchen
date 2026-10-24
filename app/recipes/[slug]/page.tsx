@@ -2,10 +2,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { auth } from '../../../auth'
-import SiteHeader from '../../../components/SiteHeader'
 import { formatIngredient } from '../../../lib/recipes/format'
 import { recipeImageUrl } from '../../../lib/recipes/image'
-import { getPublishedBySlug, publishedSearchOptions } from '../../../lib/recipes/queries'
+import { getPublishedBySlug } from '../../../lib/recipes/queries'
 import { isAdmin } from '../../../lib/roles'
 
 const HEADING = 'text-sm font-medium text-gray-900'
@@ -15,11 +14,10 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
   const { slug } = await params
   const recipe = await getPublishedBySlug(slug)
   if (!recipe) notFound()
-  const [searchOptions, session] = await Promise.all([publishedSearchOptions(), auth()])
+  const session = await auth()
 
   return (
     <div className="bg-white">
-      <SiteHeader searchOptions={searchOptions} />
       <main className="mx-auto mt-8 max-w-2xl px-4 sm:px-6 pb-20 lg:max-w-4xl lg:px-8">
         <div className="mx-auto">
           <div className="flex items-baseline justify-between">

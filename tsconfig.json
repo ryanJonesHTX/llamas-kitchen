@@ -9,8 +9,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": [
@@ -33,7 +32,6 @@
     "app/**/*.ts",
     "**/*.tsx",
     "components/**/*",
-    "models/**/*",
     "lib/**/*.ts",
     "scripts/**/*.ts",
     "types/**/*.d.ts",
