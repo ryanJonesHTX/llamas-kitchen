@@ -3,7 +3,7 @@ import { MAX_UPLOAD_BYTES } from '../../lib/uploads.ts'
 import { recordNextActions } from './actions.ts'
 import { signInAs } from './auth.ts'
 import { deleteSessions, disconnect, reseed } from './db.ts'
-import { alertWith, imageInput, saveButton } from './recipeForm.ts'
+import { alertWith, imageInput, imagePreview, imagePreviewSource, replaceImageInput, saveButton } from './recipeForm.ts'
 import { blockBrowserCloudinary, cloudinaryUploads, releaseSlowUpload, VALID_PNG } from './uploads.ts'
 
 // Upload rules on the recipe form. The form uploads through the
@@ -101,4 +101,49 @@ test('Save recipe is disabled while an image upload is in progress', async ({ pa
   releaseSlowUpload()
   await expect(page.getByText('Image uploaded!')).toBeVisible()
   await expect(saveButton(page)).toBeEnabled()
+})
+
+test('while an image uploads, the chosen file is previewed with an Uploading status', async ({ page }) => {
+  await page.goto('/new')
+  await expect(imagePreview(page)).toHaveCount(0)
+
+  await imageInput(page).setInputFiles({ name: 'slow.png', mimeType: 'image/png', buffer: VALID_PNG })
+
+  await expect(page.getByRole('status').filter({ hasText: 'Uploading…' })).toBeVisible()
+  expect(await imagePreviewSource(page)).toMatch(/^blob:/)
+  releaseSlowUpload()
+  await expect(page.getByText('Image uploaded!')).toBeVisible()
+})
+
+test('after an upload the preview shows the uploaded image from Cloudinary and the input offers a replacement', async ({
+  page,
+}) => {
+  await page.goto('/new')
+
+  await imageInput(page).setInputFiles({ name: 'lasagna.png', mimeType: 'image/png', buffer: VALID_PNG })
+
+  await expect(page.getByText('Image uploaded!')).toBeVisible()
+  await expect(imagePreview(page)).toBeVisible()
+  expect(await imagePreviewSource(page)).toMatch(
+    new RegExp(`^https://res\\.cloudinary\\.com/.+/${cloudinaryUploads()[0].publicId}$`)
+  )
+  await expect(replaceImageInput(page)).toBeAttached()
+})
+
+test('a failed replacement keeps the previously uploaded image in the preview', async ({ page }) => {
+  await page.goto('/new')
+  await imageInput(page).setInputFiles({ name: 'lasagna.png', mimeType: 'image/png', buffer: VALID_PNG })
+  await expect(page.getByText('Image uploaded!')).toBeVisible()
+  const firstPublicId = cloudinaryUploads()[0].publicId
+
+  await replaceImageInput(page).setInputFiles({
+    name: 'huge.png',
+    mimeType: 'image/png',
+    buffer: Buffer.concat([VALID_PNG, Buffer.alloc(MAX_UPLOAD_BYTES)]),
+  })
+
+  await expect(alertWith(page, /\b2\s*MB/i)).toBeVisible()
+  await expect(imagePreview(page)).toBeVisible()
+  expect(await imagePreviewSource(page)).toMatch(new RegExp(`^https://res\\.cloudinary\\.com/.+/${firstPublicId}$`))
+  await expect(replaceImageInput(page)).toBeAttached()
 })

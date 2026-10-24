@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { recipeImageUrl, type RecipeImageSize } from '../../lib/recipes/image'
+import { recipeImageUrl, recipeImageUrlPrefix, type RecipeImageSize } from '../../lib/recipes/image'
 
 // One helper builds every recipe image URL from the Cloudinary public ID.
 
@@ -45,5 +45,16 @@ describe('recipeImageUrl', () => {
 
   it('throws for a blank public ID', () => {
     expect(() => recipeImageUrl('  ', 'card')).toThrow()
+  })
+})
+
+describe('recipeImageUrlPrefix', () => {
+  it.each(sizes)('is the %s URL without the public ID', (size) => {
+    expect(`${recipeImageUrlPrefix(size)}recipes/beef-stew`).toBe(recipeImageUrl('recipes/beef-stew', size))
+  })
+
+  it('throws when CLOUDINARY_CLOUD_NAME is not set', () => {
+    vi.stubEnv('CLOUDINARY_CLOUD_NAME', '')
+    expect(() => recipeImageUrlPrefix('card')).toThrow(/CLOUDINARY_CLOUD_NAME/)
   })
 })
