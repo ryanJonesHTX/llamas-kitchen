@@ -1,11 +1,12 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './test.ts'
 import { disconnect, reseed } from './db.ts'
-import { hiddenRecipes, seedRecipe, seedRecipes } from './fixtures.ts'
+import { hiddenRecipes, pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe, seedRecipes } from './fixtures.ts'
 import { signInAs } from './auth.ts'
 import { factTerms, factValues, ingredientItems, stepsList, stepTexts, tagItems } from './recipePage.ts'
 
-// The public recipe page, /recipes/<slug>: published recipes only.
+// The recipe page, /recipes/<slug>: published recipes for everyone; pending
+// and rejected ones only for their submitter and admins.
 
 test.beforeEach(async () => {
   await reseed()
@@ -53,15 +54,69 @@ test('a recipe without a sourceUrl has no Source link', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Source', exact: true })).toHaveCount(0)
 })
 
-for (const hidden of hiddenRecipes) {
-  test(`a ${hidden.status} recipe's slug responds 404`, async ({ page }) => {
-    const response = await page.goto(`/recipes/${hidden.slug}`)
+const robots = (page: Page) => page.locator('meta[name="robots"]')
 
-    expect(response?.status()).toBe(404)
-    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
-    await expect(page.getByText(hidden.name)).toHaveCount(0)
+for (const hidden of hiddenRecipes) {
+  test.describe(`a ${hidden.status} recipe`, () => {
+    test('responds 404 to a signed-out visitor', async ({ page }) => {
+      const response = await page.goto(`/recipes/${hidden.slug}`)
+
+      expect(response?.status()).toBe(404)
+      await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
+      await expect(page.getByText(hidden.name)).toHaveCount(0)
+    })
+
+    test('responds 404 to a signed-in user who did not submit it', async ({ context, page }) => {
+      await signInAs(context, { email: 'e2e-user@example.com', role: 'user' })
+
+      const response = await page.goto(`/recipes/${hidden.slug}`)
+
+      expect(response?.status()).toBe(404)
+      await expect(page.getByText(hidden.name)).toHaveCount(0)
+    })
+
+    for (const viewer of [
+      { who: 'its submitter', id: SEED_SUBMITTER_ID, email: 'e2e-submitter@example.com', role: 'user' as const },
+      { who: 'an admin', email: 'e2e-admin@example.com', role: 'admin' as const },
+    ]) {
+      test(`shows to ${viewer.who} with a status banner, and is not indexed`, async ({ context, page }) => {
+        await signInAs(context, viewer)
+
+        const response = await page.goto(`/recipes/${hidden.slug}`)
+
+        expect(response?.status()).toBe(200)
+        await expect(page.getByRole('heading', { level: 1, name: hidden.name })).toBeVisible()
+        await expect(page.getByText(hidden.status === 'pending' ? 'Pending review' : 'Rejected', { exact: true })).toBeVisible()
+        await expect(robots(page)).toHaveAttribute('content', /noindex/)
+      })
+    }
   })
 }
+
+test('the pending banner says only the submitter and admins can see the recipe', async ({ context, page }) => {
+  await signInAs(context, { id: SEED_SUBMITTER_ID, email: 'e2e-submitter@example.com', role: 'user' })
+
+  await page.goto(`/recipes/${pendingRecipe.slug}`)
+
+  await expect(page.getByText('Pending review — only the submitter and admins can see this recipe.')).toBeVisible()
+})
+
+test('the rejected banner shows the rejection reason', async ({ context, page }) => {
+  await signInAs(context, { id: SEED_SUBMITTER_ID, email: 'e2e-submitter@example.com', role: 'user' })
+
+  await page.goto(`/recipes/${rejectedRecipe.slug}`)
+
+  await expect(page.getByText(`Rejected — ${rejectedRecipe.rejectionReason}`)).toBeVisible()
+})
+
+test('a published recipe has no status banner and no robots meta', async ({ page }) => {
+  await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByText('Pending review', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Rejected', { exact: true })).toHaveCount(0)
+  await expect(robots(page)).toHaveCount(0)
+})
 
 test('an unknown slug responds 404', async ({ page }) => {
   const unknown = 'e2e-no-such-recipe'

@@ -3,7 +3,7 @@ import RecipeForm, { type RecipeFormValues } from '../../../../components/Recipe
 import { requireAdminPage } from '../../../../lib/adminGuard'
 import { formatIngredient } from '../../../../lib/recipes/format'
 import { recipeImageUrlPrefix } from '../../../../lib/recipes/image'
-import { getRecipeForEdit, type RecipeRecord } from '../../../../lib/recipes/queries'
+import { getRecipeBySlug, type RecipeRecord } from '../../../../lib/recipes/queries'
 
 // The form's text fields, filled from the stored recipe. sourceUrl and
 // imagePublicId have no text field; carrying them through keeps an edit from unsetting them.
@@ -28,7 +28,7 @@ function formValues(recipe: RecipeRecord): RecipeFormValues {
 export default async function EditRecipePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   await requireAdminPage(`/recipes/${slug}/edit`)
-  const recipe = await getRecipeForEdit(slug)
+  const recipe = await getRecipeBySlug(slug)
   if (!recipe) notFound()
 
   return (

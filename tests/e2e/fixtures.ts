@@ -12,6 +12,10 @@ export const E2E_MONGODB_DB = 'llamas-kitchen-e2e'
 // kept submittedBy can be told apart from one overwritten with the editor.
 export const SEED_ADMIN_ID = '64e000000000000000000001'
 
+// The non-admin who submitted the pending and rejected seed recipes. Tests
+// sign in with this id (signInAs's id) to view them as their owner.
+export const SEED_SUBMITTER_ID = '64e000000000000000000002'
+
 type Ingredient = { quantity: number | null; unit: string | null; item: string }
 
 export type SeedRecipe = {
@@ -151,7 +155,7 @@ export const pendingRecipe: SeedRecipe = {
   cookTime: 45,
   tags: ['beef'],
   imagePublicId: 'recipes/e2e-pending-beef-pie',
-  submittedBy: '64e000000000000000000002',
+  submittedBy: SEED_SUBMITTER_ID,
   status: 'pending',
   createdAt: new Date('2024-06-01T12:00:00Z'),
 }
@@ -168,7 +172,7 @@ export const rejectedRecipe: SeedRecipe = {
   cookTime: 30,
   tags: ['chicken'],
   imagePublicId: 'recipes/e2e-rejected-chicken-bake',
-  submittedBy: '64e000000000000000000002',
+  submittedBy: SEED_SUBMITTER_ID,
   status: 'rejected',
   rejectionReason: 'Not a recipe.',
   createdAt: new Date('2024-07-01T12:00:00Z'),

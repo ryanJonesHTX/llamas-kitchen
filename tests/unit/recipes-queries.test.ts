@@ -23,8 +23,8 @@ const fixtures = [
 ]
 
 const hidden = [
-  { status: 'pending', id: id(5), slug: 'pending-pasta', name: 'Pending Pasta', tag: 'secret-pending' },
-  { status: 'rejected', id: id(6), slug: 'rejected-ramen', name: 'Rejected Ramen', tag: 'secret-rejected' },
+  { status: 'pending', id: id(5), name: 'Pending Pasta', tag: 'secret-pending' },
+  { status: 'rejected', id: id(6), name: 'Rejected Ramen', tag: 'secret-rejected' },
 ]
 
 beforeAll(async () => {
@@ -39,18 +39,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await mongoose.disconnect()
   await mongo?.stop()
-})
-
-describe('getPublishedBySlug', () => {
-  it('returns the published recipe with that slug', async () => {
-    const recipe = await queries.getPublishedBySlug('beef-stew')
-    expect(recipe).toMatchObject({ name: 'Beef Stew', slug: 'beef-stew', status: 'published' })
-    expect(String(recipe!._id)).toBe(id(2).toHexString())
-  })
-
-  it('returns null for an unknown slug', async () => {
-    expect(await queries.getPublishedBySlug('no-such-recipe')).toBeNull()
-  })
 })
 
 describe('getPublishedSlugById', () => {
@@ -111,11 +99,7 @@ describe('publishedTagsInUse', () => {
   })
 })
 
-describe.each(hidden)('public queries hide a $status recipe', ({ id: hiddenId, slug, name, tag }) => {
-  it('getPublishedBySlug returns null for its slug', async () => {
-    expect(await queries.getPublishedBySlug(slug)).toBeNull()
-  })
-
+describe.each(hidden)('public queries hide a $status recipe', ({ id: hiddenId, name, tag }) => {
   it('getPublishedSlugById returns null for its id', async () => {
     expect(await queries.getPublishedSlugById(hiddenId.toHexString())).toBeNull()
   })
@@ -135,16 +119,22 @@ describe.each(hidden)('public queries hide a $status recipe', ({ id: hiddenId, s
   })
 })
 
-describe('getRecipeForEdit', () => {
+describe('getRecipeBySlug', () => {
   it.each([
     ['published', 'apple-pie', 'Apple Pie'],
     ['pending', 'pending-pasta', 'Pending Pasta'],
     ['rejected', 'rejected-ramen', 'Rejected Ramen'],
   ])('returns a %s recipe by slug', async (status, slug, name) => {
-    expect(await queries.getRecipeForEdit(slug)).toMatchObject({ name, slug, status })
+    expect(await queries.getRecipeBySlug(slug)).toMatchObject({ name, slug, status })
+  })
+
+  it('returns the whole stored recipe', async () => {
+    const recipe = await queries.getRecipeBySlug('beef-stew')
+    expect(recipe).toMatchObject({ name: 'Beef Stew', slug: 'beef-stew', status: 'published' })
+    expect(String(recipe!._id)).toBe(id(2).toHexString())
   })
 
   it('returns null for an unknown slug', async () => {
-    expect(await queries.getRecipeForEdit('no-such-recipe')).toBeNull()
+    expect(await queries.getRecipeBySlug('no-such-recipe')).toBeNull()
   })
 })

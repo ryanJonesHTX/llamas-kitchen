@@ -3,7 +3,7 @@ import type { BrowserContext, Page } from '@playwright/test'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { disconnect, reseed } from './db.ts'
-import { seedRecipe } from './fixtures.ts'
+import { pendingRecipe, rejectedRecipe, seedRecipe } from './fixtures.ts'
 import { saveButton } from './recipeForm.ts'
 
 // axe-core over every page and state, in both themes. Serious and critical
@@ -66,6 +66,22 @@ const scenarios: Scenario[] = [
     name: 'recipe page',
     open: async (page) => {
       await page.goto(`/recipes/${stew.slug}`)
+    },
+  },
+  {
+    name: 'pending recipe page with its status banner',
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await page.goto(`/recipes/${pendingRecipe.slug}`)
+      await expect(page.getByText('Pending review', { exact: true })).toBeVisible()
+    },
+  },
+  {
+    name: 'rejected recipe page with its status banner',
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await page.goto(`/recipes/${rejectedRecipe.slug}`)
+      await expect(page.getByText('Rejected', { exact: true })).toBeVisible()
     },
   },
   {

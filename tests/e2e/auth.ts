@@ -8,6 +8,8 @@ const SESSION_COOKIE = 'authjs.session-token'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 type SignInAs = {
+  // A fixed user id, for signing in as a seed recipe's submitter; random otherwise.
+  id?: string
   email: string
   name?: string
   role: 'user' | 'admin'
@@ -18,10 +20,10 @@ type SignInAs = {
 // then hands the browser the session cookie. Returns the user's id.
 export async function signInAs(
   context: BrowserContext,
-  { email, name, role }: SignInAs
+  { id, email, name, role }: SignInAs
 ): Promise<string> {
   const connection = await connect()
-  const userId = new mongoose.Types.ObjectId()
+  const userId = new mongoose.Types.ObjectId(id)
   const sessionToken = randomUUID()
 
   await connection.collection(USERS_COLLECTION).insertOne({

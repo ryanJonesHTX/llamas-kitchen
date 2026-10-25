@@ -245,6 +245,19 @@ test('clearing the Notes field on edit removes the notes', async ({ page }) => {
   expect(await findRecipe({ _id: stew._id })).not.toHaveProperty('notes')
 })
 
+// Pending recipes used to 404 on their own page, so saving one did too.
+test('admin saves an edit to a pending recipe and lands on its page, still pending', async ({ page }) => {
+  await page.goto(`/recipes/${pendingRecipe.slug}/edit`)
+
+  await formField(page, 'Description').fill('Reviewed and tidied.')
+  await saveButton(page).click()
+
+  await expect(page).toHaveURL(`/recipes/${pendingRecipe.slug}`)
+  await expect(page.getByRole('heading', { level: 1, name: pendingRecipe.name })).toBeVisible()
+  await expect(page.getByText('Reviewed and tidied.')).toBeVisible()
+  expect(await findRecipe({ _id: pendingRecipe._id })).toMatchObject({ status: 'pending' })
+})
+
 test('when the save action throws (the session ended), an alert says the recipe was not saved and nothing changes', async ({
   page,
 }) => {

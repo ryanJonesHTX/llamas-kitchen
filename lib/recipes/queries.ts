@@ -12,11 +12,6 @@ const PUBLISHED = { status: 'published' } as const
 // Newest published first, ties broken by _id, matching the list cursor.
 const NEWEST_FIRST = { publishedAt: -1, _id: -1 } as const
 
-export async function getPublishedBySlug(slug: string): Promise<RecipeRecord | null> {
-  await dbConnect()
-  return Recipe.findOne({ ...PUBLISHED, slug }).lean<RecipeRecord>()
-}
-
 // For redirecting old /<id> URLs; null for an unknown or malformed id.
 export async function getPublishedSlugById(id: string): Promise<string | null> {
   if (!isObjectIdOrHexString(id)) return null
@@ -46,8 +41,8 @@ export async function publishedTagsInUse(): Promise<string[]> {
   return tags.sort()
 }
 
-// Any status: admins edit pending and rejected recipes too. Callers guard access.
-export async function getRecipeForEdit(slug: string): Promise<RecipeRecord | null> {
+// Any status. Callers guard access with canView or canEdit (./permissions).
+export async function getRecipeBySlug(slug: string): Promise<RecipeRecord | null> {
   await dbConnect()
   return Recipe.findOne({ slug }).lean<RecipeRecord>()
 }

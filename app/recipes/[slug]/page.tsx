@@ -1,4 +1,5 @@
-import type { ComponentType, SVGProps } from 'react'
+import { cache, type ComponentType, type SVGProps } from 'react'
+import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -8,16 +9,27 @@ import IngredientChecklist from '../../../components/IngredientChecklist'
 import { formatMinutes } from '../../../lib/recipes/duration'
 import { formatIngredient } from '../../../lib/recipes/format'
 import { recipeImageUrl } from '../../../lib/recipes/image'
-import { getPublishedBySlug } from '../../../lib/recipes/queries'
+import { canView } from '../../../lib/recipes/permissions'
+import { getRecipeBySlug, type RecipeRecord } from '../../../lib/recipes/queries'
 import { isAdmin } from '../../../lib/roles'
 
 const SECTION_HEADING = 'font-display text-2xl font-semibold tracking-tight text-text'
 
-export default async function RecipePage({ params }: { params: Promise<{ slug: string }> }) {
+type Props = { params: Promise<{ slug: string }> }
+
+// One database read per request, shared by generateMetadata and the page.
+const loadRecipe = cache(getRecipeBySlug)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const recipe = await loadRecipe((await params).slug)
+  return recipe && recipe.status !== 'published' ? { robots: { index: false } } : {}
+}
+
+export default async function RecipePage({ params }: Props) {
   const { slug } = await params
-  const recipe = await getPublishedBySlug(slug)
-  if (!recipe) notFound()
+  const recipe = await loadRecipe(slug)
   const session = await auth()
+  if (!recipe || !canView(session, recipe)) notFound()
 
   const facts = [
     { label: 'Prep', value: formatMinutes(recipe.prepTime), Icon: ScissorsIcon },
@@ -29,6 +41,7 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
   return (
     <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <div className="py-10 sm:py-12 print:pt-0 print:pb-8">
+        {recipe.status !== 'published' && <StatusBanner recipe={recipe} />}
         {recipe.tags.length > 0 && (
           <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-1.5">
             {recipe.tags.map((tag) => (
@@ -144,6 +157,23 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Only the owner and admins reach a pending or rejected recipe's page.
+function StatusBanner({ recipe }: { recipe: RecipeRecord }) {
+  return (
+    <div className="mb-6 max-w-3xl rounded-xl border border-border bg-surface px-4 py-3 text-sm leading-6 text-text">
+      {recipe.status === 'pending' ? (
+        <p>
+          <strong className="font-semibold">Pending review</strong> — only the submitter and admins can see this recipe.
+        </p>
+      ) : (
+        <p>
+          <strong className="font-semibold text-danger">Rejected</strong> — {recipe.rejectionReason}
+        </p>
+      )}
     </div>
   )
 }
