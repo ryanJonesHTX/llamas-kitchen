@@ -40,6 +40,14 @@ const fixtures = [
   pendingDoc({ _id: id(7), name: 'Pending Pie', slug: 'pending-pie', submittedBy: unnamedUser, createdAt: day(2) }),
   pendingDoc({ _id: id(8), name: 'Pending Paella', slug: 'pending-paella', submittedBy: deletedUser, createdAt: day(9) }),
   rejectedDoc({ _id: id(6), name: 'Rejected Ramen', slug: 'rejected-ramen', tags: ['secret-rejected'] }),
+  rejectedDoc({
+    _id: new Types.ObjectId('66000000000000000000000a'),
+    name: 'Rejected Risotto',
+    slug: 'rejected-risotto',
+    rejectionReason: 'Too salty.',
+    submittedBy: namedUser,
+    createdAt: day(7),
+  }),
 ]
 
 const hidden = [
@@ -181,5 +189,29 @@ describe('queueEntries', () => {
     })
     expect(pie.submitter).toBe('sam@example.com')
     expect(paella.submitter).toBeNull()
+  })
+})
+
+describe('submittedRecipes', () => {
+  it("returns only the user's recipes, any status, newest createdAt first", async () => {
+    const recipes = await queries.submittedRecipes(namedUser.toHexString())
+    expect(recipes.map((recipe) => recipe.name)).toEqual(['Rejected Risotto', 'Pending Pasta'])
+  })
+
+  it('returns only the fields the page shows and canEdit reads', async () => {
+    const [risotto, pasta] = await queries.submittedRecipes(namedUser.toHexString())
+    expect(risotto).toEqual({
+      name: 'Rejected Risotto',
+      slug: 'rejected-risotto',
+      status: 'rejected',
+      rejectionReason: 'Too salty.',
+      createdAt: day(7),
+      submittedBy: namedUser,
+    })
+    expect(Object.keys(pasta).sort()).toEqual(['createdAt', 'name', 'slug', 'status', 'submittedBy'])
+  })
+
+  it('returns an empty list for a user with no recipes', async () => {
+    expect(await queries.submittedRecipes('64b0000000000000000000c4')).toEqual([])
   })
 })

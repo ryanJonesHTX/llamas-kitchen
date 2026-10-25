@@ -40,6 +40,9 @@ const startAs = async (context: BrowserContext, session: Session) => {
 const visibleButton = (page: Page, name: string) =>
   page.getByRole('button', { name, exact: true }).filter({ visible: true })
 
+// The desktop user menu's button, named by the signed-in email.
+const userMenuButton = (page: Page, email: string) => visibleButton(page, email)
+
 // On desktop only the header's inline search renders; the mobile menu's copy
 // lives in a closed dialog.
 const search = (page: Page) =>
@@ -83,17 +86,15 @@ for (const { path, sessions } of sitePages) {
         continue
       }
 
-      test(`signed in as ${as}, shows the email, Sign out and Add Recipe`, async ({
+      test(`signed in as ${as}, shows the user menu, Sign out inside it, and Add Recipe`, async ({
         context,
         page,
       }) => {
         await startAs(context, as)
         await page.goto(path)
 
-        await expect(visibleButton(page, 'Sign out')).toBeVisible()
-        await expect(
-          page.getByText(emailFor(as), { exact: true }).filter({ visible: true })
-        ).toBeVisible()
+        await userMenuButton(page, emailFor(as)).click()
+        await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible()
         await expect(visibleButton(page, 'Sign in')).toHaveCount(0)
         await expect(
           page.getByRole('navigation').getByRole('link', { name: 'Add Recipe' })
@@ -165,6 +166,9 @@ for (const { path, sessions } of sitePages) {
           })
         ).toBeVisible()
         await expect(dialog.getByRole('link', { name: 'Add Recipe' })).toHaveCount(
+          session === 'signed out' ? 0 : 1
+        )
+        await expect(dialog.getByRole('link', { name: 'My recipes' })).toHaveCount(
           session === 'signed out' ? 0 : 1
         )
         await expect(dialog.getByRole('button', { name: 'Close menu' })).toBeFocused()
@@ -282,10 +286,10 @@ test('at 1024px wide the header fits for an admin with a long email', async ({ c
   // Review is the last nav link.
   const review = (await globalNavLink(page, 'Review').boundingBox())!
   const searchBox = (await search(page).boundingBox())!
-  const signOut = (await visibleButton(page, 'Sign out').boundingBox())!
+  const userMenu = (await userMenuButton(page, 'a-rather-long-admin-name@example.com').boundingBox())!
 
   expect(review.x + review.width).toBeLessThan(searchBox.x)
-  expect(signOut.x + signOut.width).toBeLessThanOrEqual(contentRight)
+  expect(userMenu.x + userMenu.width).toBeLessThanOrEqual(contentRight)
 })
 
 // No horizontal page scroll on desktop widths, with an admin's extra links and a long email.
@@ -294,7 +298,7 @@ for (const width of [1024, 1280, 1440]) {
     await signInAs(context, { email: 'ryan.admin.long-address@example.com', role: 'admin' })
     await page.setViewportSize({ width, height: 800 })
     await page.goto('/')
-    await expect(visibleButton(page, 'Sign out')).toBeVisible()
+    await expect(userMenuButton(page, 'ryan.admin.long-address@example.com')).toBeVisible()
 
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
@@ -303,3 +307,88 @@ for (const width of [1024, 1280, 1440]) {
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
   })
 }
+
+// The desktop user menu holds My recipes and Sign out.
+test.describe('desktop user menu', () => {
+  const email = 'cook@example.com'
+  const menuItem = (page: Page, name: string) => page.getByRole('menuitem', { name, exact: true })
+  // Focus stays on the menu, which points at its active item (aria-activedescendant).
+  const expectActive = async (page: Page, name: string) => {
+    const id = await menuItem(page, name).getAttribute('id')
+    await expect(page.getByRole('menu')).toBeFocused()
+    await expect(page.getByRole('menu')).toHaveAttribute('aria-activedescendant', id!)
+  }
+
+  test.beforeEach(async ({ context, page }) => {
+    await signInAs(context, { email, role: 'user' })
+    await page.goto('/')
+  })
+
+  test('shows the full email as its title', async ({ page }) => {
+    await expect(userMenuButton(page, email)).toHaveAttribute('title', email)
+  })
+
+  test('opens on click with My recipes and Sign out; My recipes navigates there', async ({ page }) => {
+    await userMenuButton(page, email).click()
+
+    await expect(page.getByRole('menuitem')).toHaveText(['My recipes', 'Sign out'])
+    await menuItem(page, 'My recipes').click()
+
+    await expect(page).toHaveURL('/my-recipes')
+    await expect(page.getByRole('heading', { level: 1, name: 'My recipes' })).toBeVisible()
+    await expect(page.getByRole('menu')).toHaveCount(0)
+
+    await userMenuButton(page, email).click()
+    await expect(menuItem(page, 'My recipes')).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('works from the keyboard, and Escape returns focus to the button', async ({ page }) => {
+    await userMenuButton(page, email).focus()
+    await page.keyboard.press('Enter')
+    await expectActive(page, 'My recipes')
+    await page.keyboard.press('ArrowDown')
+    await expectActive(page, 'Sign out')
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(userMenuButton(page, email)).toBeFocused()
+
+    await page.keyboard.press('Enter')
+    await expectActive(page, 'My recipes')
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL('/my-recipes')
+  })
+
+  test('Sign out signs the user out', async ({ page }) => {
+    await userMenuButton(page, email).click()
+    await menuItem(page, 'Sign out').click()
+
+    await expect(visibleButton(page, 'Sign in')).toBeVisible()
+    await expect(userMenuButton(page, email)).toHaveCount(0)
+  })
+})
+
+test.describe('mobile menu, signed in', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: false })
+
+  test('lists the user, My recipes and Sign out; My recipes navigates and closes the menu', async ({ context, page }) => {
+    await startAs(context, 'user')
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Open main menu' }).click()
+    const dialog = page.getByRole('dialog')
+
+    await expect(dialog.getByText(emailFor('user'), { exact: true })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+    await dialog.getByRole('link', { name: 'My recipes', exact: true }).click()
+
+    await expect(page).toHaveURL('/my-recipes')
+    await expect(page.getByRole('heading', { level: 1, name: 'My recipes' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Open main menu' }).click()
+    await expect(page.getByRole('dialog').getByRole('link', { name: 'My recipes', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+})

@@ -136,7 +136,7 @@ export default function SiteHeader({
             ))}
           </div>
           <div className="space-y-2 py-4">
-            <AuthControl mobile />
+            <AuthControl mobile onNavigate={closeMenu} />
             <div className="flex min-h-11 items-center justify-between">
               <span className="text-base text-muted">Theme</span>
               <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />

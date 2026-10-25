@@ -14,6 +14,12 @@ export type QueueEntry = Pick<RecipeRecord, '_id' | 'name' | 'slug' | 'descripti
   submitter: string | null
 }
 
+// A recipe as /my-recipes lists it. status and submittedBy feed canEdit.
+export type SubmittedRecipe = Pick<
+  RecipeRecord,
+  'name' | 'slug' | 'status' | 'rejectionReason' | 'createdAt' | 'submittedBy'
+>
+
 // The fields queueEntries reads from the Auth.js users collection.
 type UserRecord = { _id: Types.ObjectId; name?: string | null; email: string }
 
@@ -70,4 +76,15 @@ export async function queueEntries(): Promise<QueueEntry[]> {
     .toArray()
   const submitters = new Map(users.map((user) => [String(user._id), user.name || user.email]))
   return recipes.map(({ submittedBy, ...recipe }) => ({ ...recipe, submitter: submitters.get(String(submittedBy)) ?? null }))
+}
+
+// One user's recipes of any status, newest first (the { submittedBy, createdAt } index).
+export async function submittedRecipes(userId: string): Promise<SubmittedRecipe[]> {
+  await dbConnect()
+  return Recipe.find(
+    { submittedBy: userId },
+    { _id: 0, name: 1, slug: 1, status: 1, rejectionReason: 1, createdAt: 1, submittedBy: 1 }
+  )
+    .sort({ createdAt: -1 })
+    .lean<SubmittedRecipe[]>()
 }

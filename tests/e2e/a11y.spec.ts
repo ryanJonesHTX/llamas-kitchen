@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import type { BrowserContext, Page } from '@playwright/test'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
-import { deleteAllRecipes, disconnect, reseed } from './db.ts'
+import { deleteAllRecipes, disconnect, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
 import { saveButton } from './recipeForm.ts'
 
@@ -139,6 +139,33 @@ const scenarios: Scenario[] = [
       await signInAsAdmin(context)
       await page.goto('/admin/queue')
       await expect(page.getByText('Nothing waiting for review.')).toBeVisible()
+    },
+  },
+  {
+    name: 'my recipes with published, pending and rejected items',
+    open: async (page, context) => {
+      // The submitter owns the seed's pending and rejected recipes; this adds a published one.
+      await insertRecipes([
+        {
+          ...seedRecipe('E2E Pork Chops'),
+          _id: '65a000000000000000000301',
+          name: 'E2E Approved Pork Pie',
+          slug: 'e2e-approved-pork-pie',
+          submittedBy: SEED_SUBMITTER_ID,
+        },
+      ])
+      await signInAs(context, { id: SEED_SUBMITTER_ID, email: 'submitter@example.com', role: 'user' })
+      await page.goto('/my-recipes')
+      await expect(page.getByText('Reason: Not a recipe.')).toBeVisible()
+    },
+  },
+  {
+    name: 'open user menu',
+    open: async (page, context) => {
+      await signInAs(context, { email: 'user@example.com', role: 'user' })
+      await page.goto('/')
+      await page.getByRole('button', { name: 'user@example.com', exact: true }).click()
+      await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible()
     },
   },
   {
