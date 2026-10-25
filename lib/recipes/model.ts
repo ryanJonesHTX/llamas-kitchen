@@ -14,6 +14,7 @@ import {
   MAX_RECIPE_STEPS,
   MAX_RECIPE_TAG_LENGTH,
   MAX_RECIPE_TAGS,
+  MAX_REJECTION_REASON_LENGTH,
 } from '../constants.ts'
 import type { Ingredient } from '../ingredients.ts'
 import { SLUG_PATTERN } from '../slugify.ts'
@@ -122,6 +123,7 @@ const recipeSchema = new Schema<RecipeRecord>(
     rejectionReason: {
       type: String,
       trim: true,
+      maxlength: MAX_REJECTION_REASON_LENGTH,
       required(this: RecipeRecord) {
         return this.status === 'rejected'
       },

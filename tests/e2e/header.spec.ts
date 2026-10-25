@@ -245,7 +245,30 @@ test('typing part of a recipe name shows matching search options and hides the r
   await expect(page.getByRole('option', { name: 'E2E Pork Chops' })).toHaveCount(0)
 })
 
-// The desktop header starts at 1024px (lg). The admin's extra link, a long
+// Only admins get the Review link to the moderation queue.
+for (const session of ['signed out', 'user', 'admin'] as const) {
+  const shown = session === 'admin'
+  test(`${session}, the Review link is ${shown ? 'shown in the nav and the mobile menu' : 'not shown'}`, async ({
+    context,
+    page,
+  }) => {
+    await startAs(context, session)
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    if (!shown) {
+      await expect(page.getByRole('link', { name: 'Review', exact: true })).toHaveCount(0)
+      return
+    }
+    await expect(globalNavLink(page, 'Review')).toHaveAttribute('href', '/admin/queue')
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('button', { name: 'Open main menu' }).click()
+    await expect(page.getByRole('dialog').getByRole('link', { name: 'Review', exact: true })).toBeVisible()
+  })
+}
+
+// The desktop header starts at 1024px (lg). The admin's extra links, a long
 // email and the compact theme toggle must still fit inside the nav's padding.
 test('at 1024px wide the header fits for an admin with a long email', async ({ context, page }) => {
   await signInAs(context, { email: 'a-rather-long-admin-name@example.com', role: 'admin' })
@@ -256,10 +279,27 @@ test('at 1024px wide the header fits for an admin with a long email', async ({ c
   const contentRight = await nav.evaluate(
     (el) => el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight)
   )
-  const addRecipe = (await globalNavLink(page, 'Add Recipe').boundingBox())!
+  // Review is the last nav link.
+  const review = (await globalNavLink(page, 'Review').boundingBox())!
   const searchBox = (await search(page).boundingBox())!
   const signOut = (await visibleButton(page, 'Sign out').boundingBox())!
 
-  expect(addRecipe.x + addRecipe.width).toBeLessThan(searchBox.x)
+  expect(review.x + review.width).toBeLessThan(searchBox.x)
   expect(signOut.x + signOut.width).toBeLessThanOrEqual(contentRight)
 })
+
+// No horizontal page scroll on desktop widths, with an admin's extra links and a long email.
+for (const width of [1024, 1280, 1440]) {
+  test(`at ${width}px wide the page doesn't scroll sideways for an admin with a long email`, async ({ context, page }) => {
+    await signInAs(context, { email: 'ryan.admin.long-address@example.com', role: 'admin' })
+    await page.setViewportSize({ width, height: 800 })
+    await page.goto('/')
+    await expect(visibleButton(page, 'Sign out')).toBeVisible()
+
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }))
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
+  })
+}

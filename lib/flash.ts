@@ -1,13 +1,19 @@
 // A one-shot message for the next page: RecipeForm sets the cookie just
-// before it navigates, and the Toaster reads, clears and shows it. The cookie
-// holds only a key from FLASH_MESSAGES, never free text.
+// before it navigates, and the Toaster reads, clears and shows it. A change
+// that stays on the page (a review decision) sets it and then dispatches
+// FLASH_EVENT on window. The cookie holds only a key from FLASH_MESSAGES,
+// never free text.
 export const FLASH_COOKIE = 'flash'
+
+export const FLASH_EVENT = 'flash'
 
 const FLASH_MAX_AGE_SECONDS = 60
 
 const FLASH_MESSAGES = {
   saved: 'Recipe saved',
   submitted: 'Recipe submitted for review',
+  approved: 'Recipe approved',
+  rejected: 'Recipe rejected',
 } as const
 
 export type FlashKey = keyof typeof FLASH_MESSAGES

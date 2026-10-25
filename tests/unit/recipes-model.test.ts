@@ -11,6 +11,7 @@ import {
   MAX_RECIPE_STEP_LENGTH,
   MAX_RECIPE_STEPS,
   MAX_RECIPE_TAG_LENGTH,
+  MAX_REJECTION_REASON_LENGTH,
 } from '../../lib/constants'
 import { recipeDoc, pendingDoc, rejectedDoc } from '../fixtures/recipes'
 
@@ -235,6 +236,12 @@ describe('new Recipe model', () => {
       (n) => ({ ingredients: Array.from({ length: n }, () => ({ quantity: 1, unit: null, item: 'flour' })) }),
     ],
     ['tag length', MAX_RECIPE_TAG_LENGTH, 'tags', (n) => ({ tags: ['x'.repeat(n)] })],
+    [
+      'rejection reason length',
+      MAX_REJECTION_REASON_LENGTH,
+      'rejectionReason',
+      (n) => ({ status: 'rejected', publishedAt: undefined, rejectionReason: 'x'.repeat(n) }),
+    ],
   ])('%s', (_label, max, path, build) => {
     it(`allows ${max} but not ${max + 1}`, () => {
       expectValid(recipeDoc(build(max)))

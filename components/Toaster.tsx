@@ -1,36 +1,45 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline'
-import { CLEAR_FLASH_COOKIE, flashCookieValue, flashMessage } from '../lib/flash'
+import { CLEAR_FLASH_COOKIE, FLASH_EVENT, flashCookieValue, flashMessage } from '../lib/flash'
 
 const DISMISS_AFTER_MS = 4000
 
-// Shows the flash message RecipeForm left in the flash cookie. Saves
-// navigate on the client, so the root layout doesn't re-render; the cookie
-// is checked on mount and after every navigation instead, then cleared.
+// Shows the flash message left in the flash cookie. Saves navigate on the
+// client, so the root layout doesn't re-render; the cookie is checked on
+// mount, after every navigation and on FLASH_EVENT instead, then cleared.
 // The live region is just the message, so "Dismiss" isn't announced with it.
 // It and the card stay mounted so screen readers announce inserted text; the
-// card is styled and fades in only while there's a message.
+// card is styled and fades in only while there's a message. Each flash gets
+// its own id, so a repeat of the same text restarts the timer and, keyed on
+// the id, is inserted (and announced) again.
 export default function Toaster() {
   const pathname = usePathname()
-  const [message, setMessage] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
+  const lastId = useRef(0)
+  const message = toast?.text
 
   useEffect(() => {
-    const key = flashCookieValue(document.cookie)
-    if (key === undefined) return
-    document.cookie = CLEAR_FLASH_COOKIE
+    function showFlash() {
+      const key = flashCookieValue(document.cookie)
+      if (key === undefined) return
+      document.cookie = CLEAR_FLASH_COOKIE
+      const text = flashMessage(key)
+      setToast(text === null ? null : { text, id: ++lastId.current })
+    }
     // The cookie is browser state, readable only after mount; no render can derive it.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMessage(flashMessage(key))
+    showFlash()
+    window.addEventListener(FLASH_EVENT, showFlash)
+    return () => window.removeEventListener(FLASH_EVENT, showFlash)
   }, [pathname])
 
   useEffect(() => {
-    if (!message) return
-    const timer = setTimeout(() => setMessage(null), DISMISS_AFTER_MS)
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), DISMISS_AFTER_MS)
     return () => clearTimeout(timer)
-  }, [message])
+  }, [toast])
 
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex justify-center sm:inset-x-auto sm:right-6 sm:bottom-6 print:hidden">
@@ -43,12 +52,12 @@ export default function Toaster() {
       >
         {message && <CheckCircleIcon className="size-5 shrink-0 text-success" aria-hidden="true" />}
         <p role="status" aria-live="polite">
-          {message}
+          {toast && <span key={toast.id}>{toast.text}</span>}
         </p>
         {message && (
           <button
             type="button"
-            onClick={() => setMessage(null)}
+            onClick={() => setToast(null)}
             className="inline-flex size-11 items-center justify-center rounded-lg text-muted hover:text-text"
           >
             <span className="sr-only">Dismiss</span>

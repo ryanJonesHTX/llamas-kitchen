@@ -1,15 +1,16 @@
 'use server'
 
-import { Error as mongooseError, isObjectIdOrHexString, mongo, Types } from 'mongoose'
+import { revalidatePath } from 'next/cache'
+import { Error as mongooseError, isObjectIdOrHexString, mongo, Types, type HydratedDocument } from 'mongoose'
 import { z } from 'zod'
 import type { Session } from 'next-auth'
-import { MAX_PENDING_PER_USER } from '../../lib/constants'
-import { requireUserSession } from '../../lib/guards'
+import { MAX_PENDING_PER_USER, MAX_REJECTION_REASON_LENGTH } from '../../lib/constants'
+import { requireAdminSession, requireUserSession } from '../../lib/guards'
 import dbConnect from '../../lib/dbConnect'
 import { requireEnv } from '../../lib/env'
 import { IMAGE_HEADER_BYTES, matchesImageType } from '../../lib/imageType'
 import { recipeInputSchema } from '../../lib/recipes/input'
-import { Recipe } from '../../lib/recipes/model'
+import { Recipe, type RecipeRecord } from '../../lib/recipes/model'
 import { canEdit } from '../../lib/recipes/permissions'
 import { uniqueSlug } from '../../lib/recipes/slug'
 import { isAdmin } from '../../lib/roles'
@@ -25,13 +26,16 @@ import {
 
 // Write path for recipes. Server actions are public POST endpoints, so every
 // action checks the session itself, before anything else. Any signed-in user
-// may submit a recipe; a non-admin's waits for review.
+// may submit a recipe; a non-admin's waits for review, and only admins
+// approve or reject it.
 
 export type FieldErrors = Record<string, string[]>
 
 export type SaveResult = { ok: true; slug: string } | { ok: false; fieldErrors: FieldErrors } | { ok: false; formError: string }
 
 export type UploadResult = { ok: true; publicId: string } | { ok: false; error: string }
+
+export type ReviewResult = { ok: true } | { ok: false; fieldErrors: FieldErrors } | { ok: false; formError: string }
 
 // An admin edit may also change the slug.
 const recipeUpdateSchema = recipeInputSchema.extend({
@@ -44,8 +48,31 @@ const SLUG_TAKEN: SaveResult = { ok: false, fieldErrors: { slug: ['another recip
 
 const PENDING_CAP_MESSAGE = `You have ${MAX_PENDING_PER_USER} recipes waiting for review. You can submit more once they've been reviewed.`
 
-function fieldErrorsOf(error: z.ZodError): SaveResult {
+// The same answer for a missing recipe and one already reviewed.
+const NOT_PENDING: ReviewResult = { ok: false, formError: 'This recipe is no longer waiting for review.' }
+
+const CHANGED: ReviewResult = {
+  ok: false,
+  formError: 'This recipe changed since you loaded the queue. Reload to see the latest version.',
+}
+
+const rejectionSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, 'Please give a reason.')
+    .max(MAX_REJECTION_REASON_LENGTH, `must be at most ${MAX_REJECTION_REASON_LENGTH} characters`),
+})
+
+function fieldErrorsOf(error: z.ZodError): { ok: false; fieldErrors: FieldErrors } {
   return { ok: false, fieldErrors: z.flattenError(error).fieldErrors as FieldErrors }
+}
+
+// The save's $where pin matched nothing: the recipe changed since it was
+// loaded. Mongoose reports that as a VersionError when the save changed an
+// array, else as a DocumentNotFoundError.
+function matchedNothing(error: unknown): boolean {
+  return error instanceof mongooseError.DocumentNotFoundError || error instanceof mongooseError.VersionError
 }
 
 // Whether a non-admin already has as many recipes awaiting review as allowed.
@@ -126,15 +153,64 @@ export async function updateRecipe(id: string, input: unknown): Promise<SaveResu
     await recipe.save()
   } catch (error) {
     if (isDuplicateSlug(error)) return SLUG_TAKEN
-    // The status changed since the load, so $where matched nothing. Mongoose
-    // reports that as a VersionError when the edit changed an array, else
-    // as a DocumentNotFoundError.
-    if (error instanceof mongooseError.DocumentNotFoundError || error instanceof mongooseError.VersionError) {
-      return cantEdit
-    }
+    // The status changed since the load.
+    if (matchedNothing(error)) return cantEdit
     throw error
   }
   return { ok: true, slug: recipe.slug }
+}
+
+// The pending recipe with this id, as the admin saw it: `updatedAt` is the
+// queue's copy (ms since the epoch), so a decision never lands on content
+// the owner changed after the queue loaded. Its save only lands while the
+// recipe is still pending and unedited, so two admins deciding at once, or
+// an owner editing meanwhile, can't slip through between load and save.
+async function loadForDecision(id: string, updatedAt: number): Promise<HydratedDocument<RecipeRecord> | ReviewResult> {
+  // Typed, but a client can send any value.
+  if (typeof id !== 'string' || !isObjectIdOrHexString(id) || !Number.isSafeInteger(updatedAt)) return NOT_PENDING
+  await dbConnect()
+  const recipe = await Recipe.findById(id)
+  if (!recipe || recipe.status !== 'pending') return NOT_PENDING
+  if (recipe.updatedAt.getTime() !== updatedAt) return CHANGED
+  recipe.$where = { status: 'pending', updatedAt: recipe.updatedAt }
+  return recipe
+}
+
+// Saves a decision through doc.save(), so the conditional validators check
+// the new status against rejectionReason and publishedAt.
+async function saveDecision(recipe: HydratedDocument<RecipeRecord>): Promise<ReviewResult> {
+  try {
+    await recipe.save()
+  } catch (error) {
+    // Decided or edited since the load.
+    if (matchedNothing(error)) return CHANGED
+    throw error
+  }
+  // Re-renders the queue in this action's response. Recipe pages and the list render per request.
+  revalidatePath('/admin/queue')
+  return { ok: true }
+}
+
+export async function approveRecipe(id: string, updatedAt: number): Promise<ReviewResult> {
+  await requireAdminSession()
+  const recipe = await loadForDecision(id, updatedAt)
+  if ('ok' in recipe) return recipe
+  recipe.status = 'published'
+  recipe.publishedAt = new Date()
+  recipe.rejectionReason = undefined
+  return saveDecision(recipe)
+}
+
+// The submitter sees the reason on their recipe page.
+export async function rejectRecipe(id: string, updatedAt: number, reason: string): Promise<ReviewResult> {
+  await requireAdminSession()
+  const parsed = rejectionSchema.safeParse({ reason })
+  if (!parsed.success) return fieldErrorsOf(parsed.error)
+  const recipe = await loadForDecision(id, updatedAt)
+  if ('ok' in recipe) return recipe
+  recipe.status = 'rejected'
+  recipe.rejectionReason = parsed.data.reason
+  return saveDecision(recipe)
 }
 
 // Checks size and type (declared MIME type and magic bytes), then uploads to

@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import type { BrowserContext, Page } from '@playwright/test'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
-import { disconnect, reseed } from './db.ts'
+import { deleteAllRecipes, disconnect, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
 import { saveButton } from './recipeForm.ts'
 
@@ -121,6 +121,24 @@ const scenarios: Scenario[] = [
       await signInAs(context, { id: SEED_SUBMITTER_ID, email: 'submitter@example.com', role: 'user' })
       await page.goto(`/recipes/${rejectedRecipe.slug}/edit`)
       await expect(page.getByText('Rejected', { exact: true })).toBeVisible()
+    },
+  },
+  {
+    name: 'review queue with the reject form open',
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await page.goto('/admin/queue')
+      await page.getByRole('button', { name: `Reject ${pendingRecipe.name}` }).click()
+      await expect(page.getByRole('textbox', { name: 'Reason for rejecting' })).toBeVisible()
+    },
+  },
+  {
+    name: 'review queue with nothing waiting',
+    open: async (page, context) => {
+      await deleteAllRecipes()
+      await signInAsAdmin(context)
+      await page.goto('/admin/queue')
+      await expect(page.getByText('Nothing waiting for review.')).toBeVisible()
     },
   },
   {

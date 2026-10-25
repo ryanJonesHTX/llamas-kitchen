@@ -12,6 +12,7 @@ import RecipeSearch from './RecipeSearch'
 import ThemeToggle from './ThemeToggle'
 import { NAV_LINKS } from '../lib/constants'
 import type { RecipeSearchOption } from '../lib/recipes/queries'
+import { isAdmin } from '../lib/roles'
 import type { Theme } from '../lib/theme'
 
 const logo = '/images/llama-icon.webp'
@@ -51,20 +52,22 @@ export default function SiteHeader({
   const [currentTheme, setCurrentTheme] = useState(theme)
   const pathname = usePathname()
   // Hidden while the session loads, so signed-out visitors never see them.
-  const signedIn = Boolean(useSession().data)
+  const session = useSession().data ?? null
   const links = NAV_LINKS.filter(
-    (item) => signedIn || !('signedInOnly' in item && item.signedInOnly)
+    (item) =>
+      (session || !('signedInOnly' in item && item.signedInOnly)) &&
+      (isAdmin(session) || !('adminOnly' in item && item.adminOnly))
   ).map((item) => ({ ...item, active: isActive(item.href, pathname) }))
   const closeMenu = () => setMobileMenuOpen(false)
 
   return (
     <header className="border-b border-border bg-surface print:hidden">
       <nav
-        className="mx-auto flex h-16 max-w-7xl items-center gap-x-8 px-4 sm:px-6 lg:px-8 xl:gap-x-10"
+        className="mx-auto flex h-16 max-w-7xl items-center gap-x-6 px-4 sm:px-6 lg:px-8 xl:gap-x-10"
         aria-label="Global"
       >
         <Brand />
-        <div className="hidden h-full gap-x-6 lg:flex xl:gap-x-8">
+        <div className="hidden h-full gap-x-4 lg:flex xl:gap-x-8">
           {links.map((item) => (
             <Link
               key={item.name}
@@ -80,7 +83,7 @@ export default function SiteHeader({
             </Link>
           ))}
         </div>
-        <div className="ml-auto hidden items-center gap-x-4 lg:flex xl:gap-x-6">
+        <div className="ml-auto hidden items-center gap-x-3 lg:flex xl:gap-x-6">
           <div className="w-40 xl:w-64">
             <RecipeSearch options={searchOptions} />
           </div>

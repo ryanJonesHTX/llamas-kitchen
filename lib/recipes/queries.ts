@@ -1,4 +1,4 @@
-import { isObjectIdOrHexString } from 'mongoose'
+import { isObjectIdOrHexString, type Types } from 'mongoose'
 import dbConnect from '../dbConnect'
 import { CARD_FIELDS, type RecipeCardRecord } from './listing'
 import { Recipe, type RecipeRecord } from './model'
@@ -6,6 +6,16 @@ import { Recipe, type RecipeRecord } from './model'
 export type { RecipeRecord }
 
 export type RecipeSearchOption = { name: string; href: string }
+
+// A pending recipe as the review queue lists it. submitter is the user's name
+// or email, or null when their account is gone. updatedAt goes back with a
+// decision, so one never lands on content the admin didn't see.
+export type QueueEntry = Pick<RecipeRecord, '_id' | 'name' | 'slug' | 'description' | 'createdAt' | 'updatedAt'> & {
+  submitter: string | null
+}
+
+// The fields queueEntries reads from the Auth.js users collection.
+type UserRecord = { _id: Types.ObjectId; name?: string | null; email: string }
 
 const PUBLISHED = { status: 'published' } as const
 
@@ -45,4 +55,19 @@ export async function publishedTagsInUse(): Promise<string[]> {
 export async function getRecipeBySlug(slug: string): Promise<RecipeRecord | null> {
   await dbConnect()
   return Recipe.findOne({ slug }).lean<RecipeRecord>()
+}
+
+// Pending recipes oldest first (the { status, createdAt } index), with their
+// submitters looked up in one query.
+export async function queueEntries(): Promise<QueueEntry[]> {
+  await dbConnect()
+  const recipes = await Recipe.find({ status: 'pending' }, { name: 1, slug: 1, description: 1, createdAt: 1, updatedAt: 1, submittedBy: 1 })
+    .sort({ createdAt: 1 })
+    .lean<(Omit<QueueEntry, 'submitter'> & Pick<RecipeRecord, 'submittedBy'>)[]>()
+  const users = await Recipe.db
+    .collection<UserRecord>('users')
+    .find({ _id: { $in: recipes.map((recipe) => recipe.submittedBy) } }, { projection: { name: 1, email: 1 } })
+    .toArray()
+  const submitters = new Map(users.map((user) => [String(user._id), user.name || user.email]))
+  return recipes.map(({ submittedBy, ...recipe }) => ({ ...recipe, submitter: submitters.get(String(submittedBy)) ?? null }))
 }

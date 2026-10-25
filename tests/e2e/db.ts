@@ -10,6 +10,10 @@ export const E2E_MONGODB_URI = `mongodb://127.0.0.1:${E2E_MONGODB_PORT}/${E2E_MO
 export const USERS_COLLECTION = 'users'
 export const SESSIONS_COLLECTION = 'sessions'
 
+// Stored recipes always carry updatedAt (the queue's review token); a seed
+// recipe's is its createdAt.
+const stored = (recipes: SeedRecipe[]) => recipes.map((recipe) => ({ updatedAt: recipe.createdAt, ...recipe }))
+
 export async function connect() {
   if (mongoose.connection.readyState !== 1) {
     await mongoose.connect(E2E_MONGODB_URI)
@@ -24,7 +28,7 @@ export async function reseed() {
   const connection = await connect()
   await Recipe.deleteMany({})
   // The seed sets its own createdAt; timestamps would overwrite it.
-  await Recipe.insertMany(seedRecipes, { timestamps: false })
+  await Recipe.insertMany(stored(seedRecipes), { timestamps: false })
   await Recipe.createIndexes()
   await connection.collection(USERS_COLLECTION).deleteMany({})
   await connection.collection(SESSIONS_COLLECTION).deleteMany({})
@@ -34,7 +38,7 @@ export async function reseed() {
 // Adds recipes on top of the seed, for tests that need more than it holds.
 export async function insertRecipes(recipes: SeedRecipe[]): Promise<void> {
   await connect()
-  await Recipe.insertMany(recipes, { timestamps: false })
+  await Recipe.insertMany(stored(recipes), { timestamps: false })
 }
 
 // Leaves no recipes at all, for empty-state tests.

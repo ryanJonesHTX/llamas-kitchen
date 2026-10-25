@@ -49,6 +49,13 @@ describe('flashMessage', () => {
     expect(flashMessage('submitted')).toBe('Recipe submitted for review')
   })
 
+  it.each([
+    ['approved', 'Recipe approved'],
+    ['rejected', 'Recipe rejected'],
+  ])('maps %j to %j', (key, message) => {
+    expect(flashMessage(key)).toBe(message)
+  })
+
   it.each([[undefined], [''], ['Saved'], ['hacked'], ['<b>hi</b>'], ['toString'], ['__proto__'], ['constructor']])(
     'ignores the unknown key %j',
     (key) => {

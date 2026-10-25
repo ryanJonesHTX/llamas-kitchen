@@ -5,7 +5,7 @@ import { signIn, signOut, useSession } from 'next-auth/react'
 const styles = {
   desktop: {
     signedIn: 'flex items-center gap-x-4',
-    user: 'max-w-24 truncate text-sm text-muted xl:max-w-48',
+    user: 'max-w-20 truncate text-sm text-muted xl:max-w-36',
     signIn: 'whitespace-nowrap text-sm font-semibold leading-6 text-text',
     signOut: 'shrink-0 whitespace-nowrap text-sm font-semibold leading-6 text-text',
   },

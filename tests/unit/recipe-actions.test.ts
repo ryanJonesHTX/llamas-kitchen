@@ -2,17 +2,20 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import mongoose, { Types } from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import { adminId, day, pendingDoc, recipeDoc, rejectedDoc } from '../fixtures/recipes'
-import { MAX_PENDING_PER_USER } from '../../lib/constants'
+import { MAX_PENDING_PER_USER, MAX_REJECTION_REASON_LENGTH } from '../../lib/constants'
 import { signUploadParams } from '../../lib/uploadSignature'
 import { ALLOWED_FORMATS, MAX_UPLOAD_BYTES, UPLOAD_FOLDER, UPLOAD_TRANSFORMATION } from '../../lib/uploads'
 
 // The server actions in app/recipes/actions.ts against an in-memory MongoDB
 // and the real recipe model. Only the session (auth.ts pulls in next-auth),
-// next/navigation (imported by lib/guards) and Cloudinary (global fetch)
-// are faked.
+// next/navigation (imported by lib/guards), next/cache (revalidatePath needs
+// a Next request) and Cloudinary (global fetch) are faked.
 
 const { auth } = vi.hoisted(() => ({ auth: vi.fn() }))
 vi.mock('../../auth', () => ({ auth }))
+
+const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath }))
 
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(() => {
@@ -108,6 +111,7 @@ beforeEach(async () => {
   await Recipe.deleteMany({})
   auth.mockReset()
   auth.mockResolvedValue(adminSession)
+  revalidatePath.mockReset()
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
 })
@@ -662,6 +666,172 @@ describe('updateRecipe by an admin', () => {
       expect(await stored({ _id: id })).toMatchObject({ slug: 'grandmas-stew', status })
     }
   )
+})
+
+// ---------------------------------------------------------------- review
+
+describe('approveRecipe and rejectRecipe', () => {
+  const NOT_PENDING = { ok: false, formError: 'This recipe is no longer waiting for review.' }
+  const CHANGED = {
+    ok: false,
+    formError: 'This recipe changed since you loaded the queue. Reload to see the latest version.',
+  }
+  // The queue's copy of updatedAt; seed() stores day(1).
+  const SEEN = day(1).getTime()
+  const decisions = [
+    ['approveRecipe', (id: string, seen = SEEN) => actions.approveRecipe(id, seen)],
+    ['rejectRecipe', (id: string, seen = SEEN) => actions.rejectRecipe(id, seen, 'Missing the oven temperature.')],
+  ] as const
+
+  describe.each(decisions)('%s', (_name, decide) => {
+    it.each([
+      ['no session', null],
+      ['a signed-in user who is not an admin', userSession],
+    ])('throws for %s and changes nothing', async (_label, session) => {
+      const id = await seed(pendingDoc({ submittedBy: userId }))
+      auth.mockResolvedValue(session)
+      const before = await allRecipes()
+
+      await expect(decide(id.toHexString())).rejects.toThrow()
+      expect(await allRecipes()).toEqual(before)
+    })
+
+    it('throws for a non-admin before checking the id', async () => {
+      auth.mockResolvedValue(userSession)
+      await expect(decide('not-an-id')).rejects.toThrow()
+    })
+
+    it.each([
+      ['published', () => recipeDoc()],
+      ['rejected', () => rejectedDoc()],
+    ])('returns the not-pending form error for a %s recipe and changes nothing', async (_label, doc) => {
+      const id = await seed(doc())
+      const before = await allRecipes()
+
+      expect(await decide(id.toHexString())).toEqual(NOT_PENDING)
+      expect(await allRecipes()).toEqual(before)
+      expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['an unknown id', '65f000000000000000000000'],
+      ['a malformed id', 'not-an-id'],
+      // Typed as a string, but a client can post any serializable value.
+      ['an ObjectId-shaped object', { _bsontype: 'ObjectId' } as unknown as string],
+    ])('returns the not-pending form error for %s', async (_label, id) => {
+      await seed(pendingDoc())
+      const before = await allRecipes()
+
+      expect(await decide(id)).toEqual(NOT_PENDING)
+      expect(await allRecipes()).toEqual(before)
+    })
+
+    it.each([
+      ['a string', String(SEEN)],
+      ['a fraction', SEEN + 0.5],
+      ['NaN', NaN],
+      ['null', null],
+    ])('returns the not-pending form error for an updatedAt that is %s, and changes nothing', async (_label, seen) => {
+      const id = await seed(pendingDoc())
+      const before = await allRecipes()
+
+      expect(await decide(id.toHexString(), seen as unknown as number)).toEqual(NOT_PENDING)
+      expect(await allRecipes()).toEqual(before)
+    })
+
+    it('returns the changed form error when the owner edited it after the queue loaded, and changes nothing', async () => {
+      // The owner's edit already landed: the stored updatedAt is newer than the queue's.
+      const id = await seed(pendingDoc({ submittedBy: userId, description: 'Now with spam.', updatedAt: day(2) }))
+      const before = await allRecipes()
+
+      expect(await decide(id.toHexString())).toEqual(CHANGED)
+      expect(await allRecipes()).toEqual(before)
+      expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it('returns the changed form error when the owner edits it between load and save', async () => {
+      const id = await seed(pendingDoc({ submittedBy: userId }))
+      const realFindById = Recipe.findById.bind(Recipe)
+      vi.spyOn(Recipe, 'findById').mockImplementationOnce(((recipeId: unknown) =>
+        realFindById(recipeId).then(async (doc) => {
+          await Recipe.collection.updateOne({ _id: id }, { $set: { description: 'Now with spam.', updatedAt: day(2) } })
+          return doc
+        })) as unknown as typeof Recipe.findById)
+      const edited = { ...(await stored({ _id: id })), description: 'Now with spam.', updatedAt: day(2) }
+
+      expect(await decide(id.toHexString())).toEqual(CHANGED)
+      expect(await stored({ _id: id })).toEqual(edited)
+    })
+
+    it('returns the changed form error when another admin decides between load and save', async () => {
+      const id = await seed(pendingDoc({ submittedBy: userId }))
+      // The other decision lands after the action has loaded the recipe as pending.
+      const realFindById = Recipe.findById.bind(Recipe)
+      vi.spyOn(Recipe, 'findById').mockImplementationOnce(((recipeId: unknown) =>
+        realFindById(recipeId).then(async (doc) => {
+          await Recipe.collection.updateOne({ _id: id }, { $set: { status: 'rejected', rejectionReason: 'First.' } })
+          return doc
+        })) as unknown as typeof Recipe.findById)
+      const decided = { ...(await stored({ _id: id })), status: 'rejected', rejectionReason: 'First.' }
+
+      expect(await decide(id.toHexString())).toEqual(CHANGED)
+      expect(await stored({ _id: id })).toEqual(decided)
+    })
+
+    it('revalidates the review queue after a decision', async () => {
+      const id = await seed(pendingDoc())
+      expect(await decide(id.toHexString())).toEqual({ ok: true })
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/queue')
+    })
+  })
+
+  it('approveRecipe publishes a pending recipe now and leaves its content alone', async () => {
+    const id = await seed(pendingDoc({ submittedBy: userId }))
+    const before = Date.now()
+    const result = await actions.approveRecipe(id.toHexString(), SEEN)
+    const after = Date.now()
+
+    expect(result).toEqual({ ok: true })
+    const saved = await stored({ _id: id })
+    expect(saved).toMatchObject({ name: 'Beef Stew', slug: 'beef-stew', status: 'published', createdAt: day(1) })
+    expect(saved).not.toHaveProperty('rejectionReason')
+    expect(saved!.submittedBy.equals(userId)).toBe(true)
+    expect(saved!.publishedAt.getTime()).toBeGreaterThanOrEqual(before)
+    expect(saved!.publishedAt.getTime()).toBeLessThanOrEqual(after)
+  })
+
+  it('rejectRecipe stores the trimmed reason and leaves the recipe unpublished', async () => {
+    const id = await seed(pendingDoc({ submittedBy: userId }))
+
+    expect(await actions.rejectRecipe(id.toHexString(), SEEN, '  Missing the oven temperature.  ')).toEqual({ ok: true })
+    const saved = await stored({ _id: id })
+    expect(saved).toMatchObject({ status: 'rejected', rejectionReason: 'Missing the oven temperature.' })
+    expect(saved).not.toHaveProperty('publishedAt')
+  })
+
+  it(`rejectRecipe accepts a reason of ${MAX_REJECTION_REASON_LENGTH} characters`, async () => {
+    const id = await seed(pendingDoc())
+    const reason = 'x'.repeat(MAX_REJECTION_REASON_LENGTH)
+
+    expect(await actions.rejectRecipe(id.toHexString(), SEEN, reason)).toEqual({ ok: true })
+    expect(await stored({ _id: id })).toMatchObject({ rejectionReason: reason })
+  })
+
+  it.each([
+    ['an empty reason', ''],
+    ['a blank reason', '   '],
+    ['a reason that is too long', 'x'.repeat(MAX_REJECTION_REASON_LENGTH + 1)],
+    ['a reason that is not a string', 42 as unknown as string],
+  ])('rejectRecipe returns a reason field error for %s and changes nothing', async (_label, reason) => {
+    const id = await seed(pendingDoc())
+    const before = await allRecipes()
+
+    expect(await actions.rejectRecipe(id.toHexString(), SEEN, reason)).toEqual({
+      ok: false,
+      fieldErrors: { reason: messages },
+    })
+    expect(await allRecipes()).toEqual(before)
+  })
 })
 
 // ---------------------------------------------------------------- upload

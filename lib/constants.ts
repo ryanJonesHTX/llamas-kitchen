@@ -2,6 +2,7 @@ export const NAV_LINKS = [
   { name: 'Home', href: '/' },
   { name: 'Recipes', href: '/recipes' },
   { name: 'Add Recipe', href: '/new', signedInOnly: true },
+  { name: 'Review', href: '/admin/queue', adminOnly: true },
 ] as const
 
 export const RECIPE_SORT_OPTIONS = [
@@ -34,3 +35,6 @@ export const MAX_RECIPE_TAG_LENGTH = 40
 
 // Recipes a non-admin may have awaiting review at once. Admins are exempt.
 export const MAX_PENDING_PER_USER = 5
+
+// The submitter sees the reason on their recipe page.
+export const MAX_REJECTION_REASON_LENGTH = 500

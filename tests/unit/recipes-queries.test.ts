@@ -12,13 +12,33 @@ let queries: typeof import('../../lib/recipes/queries')
 
 const id = (n: number) => new Types.ObjectId(`66000000000000000000000${n}`)
 
+// Submitters in the Auth.js users collection. The third has no account.
+const namedUser = new Types.ObjectId('64b0000000000000000000c1')
+const unnamedUser = new Types.ObjectId('64b0000000000000000000c2')
+const deletedUser = new Types.ObjectId('64b0000000000000000000c3')
+const users = [
+  { _id: namedUser, name: 'Pat Cook', email: 'pat@example.com', role: 'user' },
+  { _id: unnamedUser, name: null, email: 'sam@example.com', role: 'user' },
+]
+
 // Date Bars and Beef Stew share a publishedAt; Date Bars has the larger _id.
 const fixtures = [
   recipeDoc({ _id: id(1), name: 'Apple Pie', slug: 'apple-pie', publishedAt: day(1), tags: ['dessert', 'baking'] }),
   recipeDoc({ _id: id(2), name: 'Beef Stew', slug: 'beef-stew', publishedAt: day(3), tags: ['main dish'] }),
   recipeDoc({ _id: id(3), name: 'Carrot Soup', slug: 'carrot-soup', publishedAt: day(2), tags: ['soup'] }),
   recipeDoc({ _id: id(4), name: 'Date Bars', slug: 'date-bars', publishedAt: day(3), tags: ['dessert'] }),
-  pendingDoc({ _id: id(5), name: 'Pending Pasta', slug: 'pending-pasta', tags: ['secret-pending'] }),
+  pendingDoc({
+    _id: id(5),
+    name: 'Pending Pasta',
+    slug: 'pending-pasta',
+    description: 'Fresh pasta.',
+    tags: ['secret-pending'],
+    submittedBy: namedUser,
+    createdAt: day(5),
+    updatedAt: day(6),
+  }),
+  pendingDoc({ _id: id(7), name: 'Pending Pie', slug: 'pending-pie', submittedBy: unnamedUser, createdAt: day(2) }),
+  pendingDoc({ _id: id(8), name: 'Pending Paella', slug: 'pending-paella', submittedBy: deletedUser, createdAt: day(9) }),
   rejectedDoc({ _id: id(6), name: 'Rejected Ramen', slug: 'rejected-ramen', tags: ['secret-rejected'] }),
 ]
 
@@ -32,7 +52,9 @@ beforeAll(async () => {
   process.env.MONGODB_URI = mongo.getUri('recipes-queries-test')
   await (await import('../../lib/dbConnect.ts')).default()
   const { Recipe } = await import('../../lib/recipes/model')
-  await Recipe.create(fixtures)
+  // Without timestamps, so the queue fixtures keep their createdAt and updatedAt.
+  await Recipe.insertMany(fixtures, { timestamps: false })
+  await mongoose.connection.collection('users').insertMany(users)
   queries = await import('../../lib/recipes/queries')
 })
 
@@ -136,5 +158,28 @@ describe('getRecipeBySlug', () => {
 
   it('returns null for an unknown slug', async () => {
     expect(await queries.getRecipeBySlug('no-such-recipe')).toBeNull()
+  })
+})
+
+describe('queueEntries', () => {
+  it('returns only pending recipes, oldest createdAt first', async () => {
+    const entries = await queries.queueEntries()
+    expect(entries.map((entry) => entry.name)).toEqual(['Pending Pie', 'Pending Pasta', 'Pending Paella'])
+  })
+
+  it('returns the fields the queue shows, its updatedAt, and the submitter name, else email, else null', async () => {
+    const [pie, pasta, paella] = await queries.queueEntries()
+    expect(Object.keys(pasta).sort()).toEqual(['_id', 'createdAt', 'description', 'name', 'slug', 'submitter', 'updatedAt'])
+    expect(pasta).toEqual({
+      _id: id(5),
+      name: 'Pending Pasta',
+      slug: 'pending-pasta',
+      description: 'Fresh pasta.',
+      createdAt: day(5),
+      updatedAt: day(6),
+      submitter: 'Pat Cook',
+    })
+    expect(pie.submitter).toBe('sam@example.com')
+    expect(paella.submitter).toBeNull()
   })
 })
