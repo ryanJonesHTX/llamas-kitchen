@@ -7,8 +7,9 @@ import { seedRecipe, seedRecipes } from './fixtures.ts'
 import { fillNewRecipe, formField, imageInput, newRecipe, saveButton } from './recipeForm.ts'
 import { blockBrowserCloudinary, cloudinaryUploads, VALID_PNG } from './uploads.ts'
 
-// Creating needs a signed-in user and editing an admin, in the pages and in
-// the server actions behind them; reading stays public.
+// Creating needs a signed-in user and editing a published recipe an admin, in
+// the pages and in the server actions behind them; reading stays public.
+// Owners editing their own pending or rejected recipes: owner-edit.spec.ts.
 
 test.beforeEach(async () => {
   await reseed()
@@ -127,14 +128,15 @@ test.describe('replaying an admin server action', () => {
     expect(await countRecipes()).toBe(seedRecipes.length + 2)
   })
 
-  test('update, without a session or as a user, changes nothing', async ({ page, request }) => {
+  test("update, without a session or as a user who doesn't own it, changes nothing", async ({ page, request }) => {
     const description = 'Replayed description.'
     await page.goto(`/recipes/${stew.slug}/edit`)
     await formField(page, 'Description').fill(description)
     const update = await captureNextAction(page, () => saveButton(page).click())
 
     await replayAnonymous(request, update)
-    expect(await replayAsUser(update), 'user session').toBe(false)
+    // The action answers a user with a form error rather than throwing.
+    await replayAsUser(update)
     expect((await findRecipe({ _id: stew._id }))?.description).toBe(stew.description)
 
     await replayAsAdmin(page, update)

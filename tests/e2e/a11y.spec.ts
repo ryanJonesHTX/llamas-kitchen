@@ -3,7 +3,7 @@ import type { BrowserContext, Page } from '@playwright/test'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { disconnect, reseed } from './db.ts'
-import { pendingRecipe, rejectedRecipe, seedRecipe } from './fixtures.ts'
+import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
 import { saveButton } from './recipeForm.ts'
 
 // axe-core over every page and state, in both themes. Serious and critical
@@ -113,6 +113,14 @@ const scenarios: Scenario[] = [
     open: async (page, context) => {
       await signInAsAdmin(context)
       await page.goto(`/recipes/${stew.slug}/edit`)
+    },
+  },
+  {
+    name: "owner's edit form for a rejected recipe, with the rejection reason",
+    open: async (page, context) => {
+      await signInAs(context, { id: SEED_SUBMITTER_ID, email: 'submitter@example.com', role: 'user' })
+      await page.goto(`/recipes/${rejectedRecipe.slug}/edit`)
+      await expect(page.getByText('Rejected', { exact: true })).toBeVisible()
     },
   },
   {

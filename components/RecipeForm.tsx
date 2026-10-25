@@ -17,7 +17,9 @@ import {
 import { flashCookie, type FlashKey } from '../lib/flash'
 import { parseIngredient } from '../lib/ingredients'
 import { recipeInputSchema } from '../lib/recipes/input'
+import type { RecipeStatus } from '../lib/recipes/model'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
+import RecipeStatusBanner from './RecipeStatusBanner'
 import { SortableIngredient, SortableIngredients } from './SortableIngredients'
 
 // The trimmed, non-blank pieces of `text`.
@@ -168,23 +170,45 @@ function setFlash(key: FlashKey) {
   document.cookie = flashCookie(key)
 }
 
-// Creates a recipe, or with `recipeId` edits that recipe (and its slug).
-// A recipe a non-admin creates waits for review, and the labels say so.
+// Creates a recipe, or with `recipeId` (and its `status`) edits that recipe.
+// Only admins see the slug. A recipe a non-admin creates, or resubmits after
+// rejection, waits for review, and the labels say so.
 // Images upload through the uploadRecipeImage action as soon as one is chosen.
 // `imageUrlPrefix` (recipeImageUrlPrefix) plus a public ID is the preview's Cloudinary URL.
 export default function RecipeForm({
   admin,
   recipeId,
+  status,
+  rejectionReason,
   initialValues = EMPTY_VALUES,
   imageUrlPrefix,
 }: {
   admin: boolean
   recipeId?: string
+  status?: RecipeStatus
+  rejectionReason?: string
   initialValues?: RecipeFormValues
   imageUrlPrefix: string
 }) {
   const router = useRouter()
   const forReview = !recipeId && !admin
+  const ownerEdit = !!recipeId && !admin
+  // The server sends a rejected recipe its owner saves back to review.
+  const resubmit = ownerEdit && status === 'rejected'
+  const submitLabel = forReview
+    ? 'Submit for review'
+    : resubmit
+      ? 'Resubmit for review'
+      : ownerEdit
+        ? 'Save changes'
+        : 'Save recipe'
+  const intro = !recipeId
+    ? 'Please fill out the form to add a new recipe.'
+    : resubmit
+      ? 'Saving sends the recipe back for review.'
+      : ownerEdit
+        ? 'Your changes stay pending until an admin reviews the recipe.'
+        : 'Change any field and save the recipe.'
   const [uploaded, setUploaded] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -236,7 +260,7 @@ export default function RecipeForm({
       return setError('root.server', { message: SAVE_FAILED })
     }
     if (result.ok) {
-      setFlash(forReview ? 'submitted' : 'saved')
+      setFlash(forReview || resubmit ? 'submitted' : 'saved')
       return router.push(`/recipes/${result.slug}`)
     }
     if ('formError' in result) return setError('root.server', { message: result.formError })
@@ -289,9 +313,10 @@ export default function RecipeForm({
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl text-text text-balance">{recipeId ? 'Edit Recipe' : 'New Recipe'}</h1>
       <p className="mt-2 text-muted">
-        {recipeId ? 'Change any field and save the recipe.' : 'Please fill out the form to add a new recipe.'}
+        {intro}
       </p>
       {forReview && <p className="mt-1 text-sm text-muted">Submissions are reviewed before they appear publicly.</p>}
+      {status === 'rejected' && <RecipeStatusBanner status={status} rejectionReason={rejectionReason} className="mt-6" />}
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit(save, (invalid) => showInvalid(Object.keys(invalid)))} noValidate>
         <Card id="basics" title="Basics">
@@ -305,7 +330,7 @@ export default function RecipeForm({
             />
           </Field>
 
-          {recipeId && (
+          {recipeId && admin && (
             <Field
               id="slug"
               label="Slug"
@@ -527,7 +552,7 @@ export default function RecipeForm({
               disabled={isSubmitting || uploading}
               className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-on-primary shadow-xs hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {forReview ? 'Submit for review' : 'Save recipe'}
+              {submitLabel}
             </button>
           </div>
         </div>

@@ -6,12 +6,12 @@ import { notFound } from 'next/navigation'
 import { ArrowTopRightOnSquareIcon, ClockIcon, FireIcon, ScissorsIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { auth } from '../../../auth'
 import IngredientChecklist from '../../../components/IngredientChecklist'
+import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
 import { formatMinutes } from '../../../lib/recipes/duration'
 import { formatIngredient } from '../../../lib/recipes/format'
 import { recipeImageUrl } from '../../../lib/recipes/image'
-import { canView } from '../../../lib/recipes/permissions'
-import { getRecipeBySlug, type RecipeRecord } from '../../../lib/recipes/queries'
-import { isAdmin } from '../../../lib/roles'
+import { canEdit, canView } from '../../../lib/recipes/permissions'
+import { getRecipeBySlug } from '../../../lib/recipes/queries'
 
 const SECTION_HEADING = 'font-display text-2xl font-semibold tracking-tight text-text'
 
@@ -41,7 +41,9 @@ export default async function RecipePage({ params }: Props) {
   return (
     <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <div className="py-10 sm:py-12 print:pt-0 print:pb-8">
-        {recipe.status !== 'published' && <StatusBanner recipe={recipe} />}
+        {recipe.status !== 'published' && (
+          <RecipeStatusBanner status={recipe.status} rejectionReason={recipe.rejectionReason} className="mb-6" />
+        )}
         {recipe.tags.length > 0 && (
           <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-1.5">
             {recipe.tags.map((tag) => (
@@ -63,7 +65,7 @@ export default async function RecipePage({ params }: Props) {
               <Fact key={label} label={label} value={value} Icon={Icon} />
             ))}
           </dl>
-          {isAdmin(session) && (
+          {canEdit(session, recipe) && (
             <div className="flex flex-wrap items-center gap-3 print:hidden">
               <Link
                 href={`/recipes/${recipe.slug}/edit`}
@@ -157,23 +159,6 @@ export default async function RecipePage({ params }: Props) {
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-// Only the owner and admins reach a pending or rejected recipe's page.
-function StatusBanner({ recipe }: { recipe: RecipeRecord }) {
-  return (
-    <div className="mb-6 max-w-3xl rounded-xl border border-border bg-surface px-4 py-3 text-sm leading-6 text-text">
-      {recipe.status === 'pending' ? (
-        <p>
-          <strong className="font-semibold">Pending review</strong> — only the submitter and admins can see this recipe.
-        </p>
-      ) : (
-        <p>
-          <strong className="font-semibold text-danger">Rejected</strong> — {recipe.rejectionReason}
-        </p>
-      )}
     </div>
   )
 }

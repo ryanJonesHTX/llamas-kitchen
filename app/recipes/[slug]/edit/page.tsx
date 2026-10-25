@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
 import RecipeForm, { type RecipeFormValues } from '../../../../components/RecipeForm'
-import { requireAdminPage } from '../../../../lib/guards'
+import { requireUserPage } from '../../../../lib/guards'
 import { formatIngredient } from '../../../../lib/recipes/format'
 import { recipeImageUrlPrefix } from '../../../../lib/recipes/image'
+import { canEdit } from '../../../../lib/recipes/permissions'
 import { getRecipeBySlug, type RecipeRecord } from '../../../../lib/recipes/queries'
 import { isAdmin } from '../../../../lib/roles'
 
@@ -28,14 +29,17 @@ function formValues(recipe: RecipeRecord): RecipeFormValues {
 
 export default async function EditRecipePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const session = await requireAdminPage(`/recipes/${slug}/edit`)
+  const session = await requireUserPage(`/recipes/${slug}/edit`)
   const recipe = await getRecipeBySlug(slug)
-  if (!recipe) notFound()
+  // The same 404 for a missing recipe and one this user may not edit.
+  if (!recipe || !canEdit(session, recipe)) notFound()
 
   return (
     <RecipeForm
       admin={isAdmin(session)}
       recipeId={recipe._id.toHexString()}
+      status={recipe.status}
+      rejectionReason={recipe.rejectionReason}
       initialValues={formValues(recipe)}
       imageUrlPrefix={recipeImageUrlPrefix('card')}
     />

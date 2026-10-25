@@ -211,7 +211,7 @@ test.describe('the Edit link', () => {
     await expect(editLink(page)).toHaveAttribute('href', `/recipes/${stew.slug}/edit`)
   })
 
-  test('a signed-in non-admin sees no Edit', async ({ context, page }) => {
+  test("a signed-in non-admin sees no Edit on someone else's recipe", async ({ context, page }) => {
     await signInAs(context, { email: 'e2e-user@example.com', role: 'user' })
 
     await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)

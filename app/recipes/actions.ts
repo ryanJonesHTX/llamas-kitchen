@@ -1,15 +1,16 @@
 'use server'
 
-import { isObjectIdOrHexString, mongo, Types } from 'mongoose'
+import { Error as mongooseError, isObjectIdOrHexString, mongo, Types } from 'mongoose'
 import { z } from 'zod'
 import type { Session } from 'next-auth'
 import { MAX_PENDING_PER_USER } from '../../lib/constants'
-import { requireAdminSession, requireUserSession } from '../../lib/guards'
+import { requireUserSession } from '../../lib/guards'
 import dbConnect from '../../lib/dbConnect'
 import { requireEnv } from '../../lib/env'
 import { IMAGE_HEADER_BYTES, matchesImageType } from '../../lib/imageType'
 import { recipeInputSchema } from '../../lib/recipes/input'
 import { Recipe } from '../../lib/recipes/model'
+import { canEdit } from '../../lib/recipes/permissions'
 import { uniqueSlug } from '../../lib/recipes/slug'
 import { isAdmin } from '../../lib/roles'
 import { SLUG_PATTERN } from '../../lib/slugify'
@@ -86,30 +87,51 @@ export async function createRecipe(input: unknown): Promise<SaveResult> {
   return { ok: true, slug }
 }
 
-// Replaces the input fields and the slug; submittedBy, status, publishedAt and
-// createdAt are never touched. Saved through doc.save() so the conditional
+// Replaces the input fields, and for an admin the slug; submittedBy,
+// publishedAt and createdAt are never touched. An owner saving their rejected
+// recipe sends it back to review; otherwise the status is kept. Edits never
+// meet the pending cap. Saved through doc.save() so the conditional
 // validators run against the whole document.
 export async function updateRecipe(id: string, input: unknown): Promise<SaveResult> {
-  await requireAdminSession()
-  const notFound: SaveResult = { ok: false, formError: 'This recipe no longer exists.' }
+  const session = await requireUserSession()
+  // The same answer for a missing recipe and one this user may not edit
+  // (or no longer may: an admin can approve it while the owner edits).
+  const cantEdit: SaveResult = { ok: false, formError: "This recipe can't be edited." }
   // Typed as a string, but a client can send any value.
-  if (typeof id !== 'string' || !isObjectIdOrHexString(id)) return notFound
-  const parsed = recipeUpdateSchema.safeParse(input)
+  if (typeof id !== 'string' || !isObjectIdOrHexString(id)) return cantEdit
+  const admin = isAdmin(session)
+  // An owner's input has no slug; one sent anyway is stripped.
+  const schema = admin ? recipeUpdateSchema : recipeInputSchema
+  const parsed = schema.safeParse(input)
   if (!parsed.success) return fieldErrorsOf(parsed.error)
+  const data: Record<string, unknown> = parsed.data
 
   await dbConnect()
   const recipe = await Recipe.findById(id)
-  if (!recipe) return notFound
-  if (await Recipe.exists({ slug: parsed.data.slug, _id: { $ne: recipe._id } })) return SLUG_TAKEN
+  if (!recipe || !canEdit(session, recipe)) return cantEdit
+  // Saves only if the status is still the one canEdit saw: an admin approving
+  // it meanwhile must not publish the owner's unreviewed edit.
+  recipe.$where = { status: recipe.status }
 
   // Every schema field, so an optional one left out of the input is unset.
-  for (const field of Object.keys(recipeUpdateSchema.shape) as (keyof typeof parsed.data)[]) {
-    recipe.set(field, parsed.data[field])
+  for (const field of Object.keys(schema.shape)) recipe.set(field, data[field])
+  if (recipe.isModified('slug') && (await Recipe.exists({ slug: recipe.slug, _id: { $ne: recipe._id } }))) {
+    return SLUG_TAKEN
+  }
+  if (!admin && recipe.status === 'rejected') {
+    recipe.status = 'pending'
+    recipe.rejectionReason = undefined
   }
   try {
     await recipe.save()
   } catch (error) {
     if (isDuplicateSlug(error)) return SLUG_TAKEN
+    // The status changed since the load, so $where matched nothing. Mongoose
+    // reports that as a VersionError when the edit changed an array, else
+    // as a DocumentNotFoundError.
+    if (error instanceof mongooseError.DocumentNotFoundError || error instanceof mongooseError.VersionError) {
+      return cantEdit
+    }
     throw error
   }
   return { ok: true, slug: recipe.slug }
@@ -117,11 +139,10 @@ export async function updateRecipe(id: string, input: unknown): Promise<SaveResu
 
 // Checks size and type (declared MIME type and magic bytes), then uploads to
 // Cloudinary with a signed request from the server. Cloudinary's response
-// body is never returned or logged, since it can echo the signature. A
-// non-admin at the pending cap couldn't save the recipe, so can't upload either.
+// body is never returned or logged, since it can echo the signature. The
+// pending cap doesn't apply: an owner at the cap may still edit their recipe's image.
 export async function uploadRecipeImage(formData: FormData): Promise<UploadResult> {
-  const session = await requireUserSession()
-  if (await atPendingCap(session)) return { ok: false, error: PENDING_CAP_MESSAGE }
+  await requireUserSession()
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'Please choose an image file.' }
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: UPLOAD_TOO_LARGE_MESSAGE }

@@ -48,11 +48,6 @@ const adminSession = sessionFor('admin', actingAdminId)
 const userId = new Types.ObjectId('64b0000000000000000000bb')
 const userSession = sessionFor('user', userId)
 
-const unauthorized = [
-  { label: 'no session', session: null },
-  { label: 'a user session', session: userSession },
-]
-
 let mongo: MongoMemoryServer
 let actions: typeof import('../../app/recipes/actions')
 let Recipe: typeof import('../../lib/recipes/model').Recipe
@@ -188,25 +183,21 @@ describe('every action rejects callers with no session', () => {
   })
 })
 
-describe('updateRecipe rejects callers who are not admins', () => {
-  describe.each(unauthorized)('with $label', ({ session }) => {
-    beforeEach(async () => {
-      await seed(recipeDoc({ slug: 'beef-stew' }))
-      auth.mockResolvedValue(session)
-    })
+describe('updateRecipe rejects callers with no session', () => {
+  beforeEach(async () => {
+    await seed(recipeDoc({ slug: 'beef-stew' }))
+    auth.mockResolvedValue(null)
+  })
 
-    it('throws and leaves the recipe unchanged', async () => {
-      const before = await allRecipes()
-      const id = String(before[0]._id)
-      await expect(
-        actions.updateRecipe(id, validInput({ name: 'Hacked', slug: 'hacked' }))
-      ).rejects.toThrow()
-      expect(await allRecipes()).toEqual(before)
-    })
+  it('throws and leaves the recipe unchanged', async () => {
+    const before = await allRecipes()
+    const id = String(before[0]._id)
+    await expect(actions.updateRecipe(id, validInput({ name: 'Hacked', slug: 'hacked' }))).rejects.toThrow()
+    expect(await allRecipes()).toEqual(before)
+  })
 
-    it('throws before checking the id', async () => {
-      await expect(actions.updateRecipe('not-an-id', validInput({ slug: 'x' }))).rejects.toThrow()
-    })
+  it('throws before checking the id', async () => {
+    await expect(actions.updateRecipe('not-an-id', validInput({ slug: 'x' }))).rejects.toThrow()
   })
 })
 
@@ -365,30 +356,10 @@ describe('the pending cap', () => {
     expect(await actions.createRecipe(validInput())).toEqual({ ok: true, slug: 'beef-stew' })
   })
 
-  it('refuses an upload at the cap with the same message, without calling Cloudinary', async () => {
+  it('does not apply to uploads: a user at the cap can still upload', async () => {
     auth.mockResolvedValue(userSession)
     fetchMock.mockImplementation(async () => cloudinaryOk())
     await seedPending(MAX_PENDING_PER_USER)
-
-    const result = await actions.uploadRecipeImage(formWith(pngFile()))
-
-    expect(result).toEqual({
-      ok: false,
-      error: "You have 5 recipes waiting for review. You can submit more once they've been reviewed.",
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('lets a user under the cap upload', async () => {
-    auth.mockResolvedValue(userSession)
-    fetchMock.mockImplementation(async () => cloudinaryOk())
-    await seedPending(MAX_PENDING_PER_USER - 1)
-    expect(await actions.uploadRecipeImage(formWith(pngFile()))).toEqual({ ok: true, publicId: 'recipes/abc123' })
-  })
-
-  it('does not stop an admin uploading', async () => {
-    fetchMock.mockImplementation(async () => cloudinaryOk())
-    await seedPending(MAX_PENDING_PER_USER, actingAdminId)
     expect(await actions.uploadRecipeImage(formWith(pngFile()))).toEqual({ ok: true, publicId: 'recipes/abc123' })
   })
 })
@@ -573,6 +544,124 @@ describe('updateRecipe', () => {
     expect(result).toEqual({ ok: false, fieldErrors: expect.objectContaining({ slug: messages }) })
     expect(await stored({ _id: id })).toMatchObject({ slug: 'beef-stew', name: 'Beef Stew' })
   })
+})
+
+describe('updateRecipe for a signed-in user who is not an admin', () => {
+  const CANT_EDIT = { ok: false, formError: "This recipe can't be edited." }
+
+  beforeEach(() => {
+    auth.mockResolvedValue(userSession)
+  })
+
+  it('saves an edit to their pending recipe and keeps it pending', async () => {
+    const id = await seed(pendingDoc({ slug: 'beef-stew', submittedBy: userId }))
+
+    const result = await actions.updateRecipe(id.toHexString(), validInput({ description: 'Now with thyme.' }))
+
+    expect(result).toEqual({ ok: true, slug: 'beef-stew' })
+    const saved = await stored({ _id: id })
+    expect(saved).toMatchObject({ description: 'Now with thyme.', status: 'pending' })
+    expect(saved).not.toHaveProperty('publishedAt')
+  })
+
+  it('sends their rejected recipe back to review, with the rejection reason unset', async () => {
+    const id = await seed(rejectedDoc({ slug: 'beef-stew', submittedBy: userId }))
+
+    const result = await actions.updateRecipe(id.toHexString(), validInput({ description: 'Fixed it.' }))
+
+    expect(result).toEqual({ ok: true, slug: 'beef-stew' })
+    const saved = await stored({ _id: id })
+    expect(saved).toMatchObject({ description: 'Fixed it.', status: 'pending' })
+    expect(saved).not.toHaveProperty('rejectionReason')
+    expect(saved).not.toHaveProperty('publishedAt')
+  })
+
+  it('ignores a sent slug, keeping the recipe at its own', async () => {
+    const id = await seed(pendingDoc({ slug: 'beef-stew', submittedBy: userId }))
+
+    const result = await actions.updateRecipe(id.toHexString(), validInput({ name: 'Lamb Stew', slug: 'lamb-stew' }))
+
+    expect(result).toEqual({ ok: true, slug: 'beef-stew' })
+    expect(await stored({ _id: id })).toMatchObject({ name: 'Lamb Stew', slug: 'beef-stew' })
+  })
+
+  it('ignores a client-supplied status and rejectionReason', async () => {
+    const id = await seed(pendingDoc({ slug: 'beef-stew', submittedBy: userId }))
+
+    await actions.updateRecipe(id.toHexString(), validInput({ status: 'published', rejectionReason: 'x' }))
+
+    const saved = await stored({ _id: id })
+    expect(saved).toMatchObject({ status: 'pending' })
+    expect(saved).not.toHaveProperty('rejectionReason')
+  })
+
+  it.each([
+    ['their own published recipe', () => recipeDoc({ slug: 'beef-stew', submittedBy: userId })],
+    ["another user's pending recipe", () => pendingDoc({ slug: 'beef-stew' })],
+    ["another user's rejected recipe", () => rejectedDoc({ slug: 'beef-stew' })],
+    ["another user's published recipe", () => recipeDoc({ slug: 'beef-stew' })],
+  ])("returns the can't-edit form error for %s and changes nothing", async (_label, doc) => {
+    const id = await seed(doc())
+    const before = await allRecipes()
+
+    expect(await actions.updateRecipe(id.toHexString(), validInput({ name: 'Hacked' }))).toEqual(CANT_EDIT)
+    expect(await allRecipes()).toEqual(before)
+  })
+
+  it('returns the same form error for a recipe that does not exist', async () => {
+    expect(await actions.updateRecipe('65f000000000000000000000', validInput())).toEqual(CANT_EDIT)
+  })
+
+  // Mongoose throws DocumentNotFoundError when the edit changes no array, and
+  // VersionError when it does (the array change adds a version check).
+  it.each([
+    ['changing no array', { description: 'Sneaked in.' }],
+    ['changing an array', { description: 'Sneaked in.', steps: ['Sneak it in.'] }],
+  ])(
+    "returns the can't-edit form error when an admin approves the recipe between load and save, %s",
+    async (_label, overrides) => {
+      const id = await seed(pendingDoc({ slug: 'beef-stew', submittedBy: userId }))
+      // The approval lands after the action has loaded the recipe as pending.
+      const realFindById = Recipe.findById.bind(Recipe)
+      vi.spyOn(Recipe, 'findById').mockImplementationOnce(((recipeId: unknown) =>
+        realFindById(recipeId).then(async (doc) => {
+          await Recipe.collection.updateOne({ _id: id }, { $set: { status: 'published', publishedAt: day(3) } })
+          return doc
+        })) as unknown as typeof Recipe.findById)
+      const approved = { ...(await stored({ _id: id })), status: 'published', publishedAt: day(3) }
+
+      expect(await actions.updateRecipe(id.toHexString(), validInput(overrides))).toEqual(CANT_EDIT)
+      expect(await stored({ _id: id })).toEqual(approved)
+    }
+  )
+
+  it('lets a user at the pending cap edit a pending recipe and resubmit a rejected one', async () => {
+    for (let n = 1; n <= MAX_PENDING_PER_USER; n++) {
+      await seed(pendingDoc({ slug: `pending-${n}`, submittedBy: userId }))
+    }
+    const pendingId = (await stored({ slug: 'pending-1' }))!._id
+    const rejectedId = await seed(rejectedDoc({ slug: 'rejected-1', submittedBy: userId }))
+
+    expect(await actions.updateRecipe(pendingId.toHexString(), validInput())).toEqual({ ok: true, slug: 'pending-1' })
+    expect(await actions.updateRecipe(rejectedId.toHexString(), validInput())).toEqual({ ok: true, slug: 'rejected-1' })
+    expect(await stored({ _id: rejectedId })).toMatchObject({ status: 'pending' })
+  })
+})
+
+describe('updateRecipe by an admin', () => {
+  it.each([['pending'], ['rejected']] as const)(
+    'keeps a %s recipe in its status, and may change its slug',
+    async (status) => {
+      const doc = status === 'pending' ? pendingDoc : rejectedDoc
+      // Submitted by the acting admin, so ownership can't be what decides.
+      const id = await seed(doc({ slug: 'beef-stew', submittedBy: actingAdminId }))
+
+      const result = await actions.updateRecipe(id.toHexString(), validInput({ slug: 'grandmas-stew' }))
+
+      expect(result).toEqual({ ok: true, slug: 'grandmas-stew' })
+      expect(await stored({ _id: id })).toMatchObject({ slug: 'grandmas-stew', status })
+    }
+  )
 })
 
 // ---------------------------------------------------------------- upload
