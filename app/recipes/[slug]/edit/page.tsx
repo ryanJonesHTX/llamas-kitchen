@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
 import RecipeForm, { type RecipeFormValues } from '../../../../components/RecipeForm'
-import { requireAdminPage } from '../../../../lib/adminGuard'
+import { requireAdminPage } from '../../../../lib/guards'
 import { formatIngredient } from '../../../../lib/recipes/format'
 import { recipeImageUrlPrefix } from '../../../../lib/recipes/image'
 import { getRecipeBySlug, type RecipeRecord } from '../../../../lib/recipes/queries'
+import { isAdmin } from '../../../../lib/roles'
 
 // The form's text fields, filled from the stored recipe. sourceUrl and
 // imagePublicId have no text field; carrying them through keeps an edit from unsetting them.
@@ -27,12 +28,13 @@ function formValues(recipe: RecipeRecord): RecipeFormValues {
 
 export default async function EditRecipePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  await requireAdminPage(`/recipes/${slug}/edit`)
+  const session = await requireAdminPage(`/recipes/${slug}/edit`)
   const recipe = await getRecipeBySlug(slug)
   if (!recipe) notFound()
 
   return (
     <RecipeForm
+      admin={isAdmin(session)}
       recipeId={recipe._id.toHexString()}
       initialValues={formValues(recipe)}
       imageUrlPrefix={recipeImageUrlPrefix('card')}

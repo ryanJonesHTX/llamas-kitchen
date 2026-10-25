@@ -1,7 +1,7 @@
 export const NAV_LINKS = [
   { name: 'Home', href: '/' },
   { name: 'Recipes', href: '/recipes' },
-  { name: 'Add Recipe', href: '/new', adminOnly: true },
+  { name: 'Add Recipe', href: '/new', signedInOnly: true },
 ] as const
 
 export const RECIPE_SORT_OPTIONS = [
@@ -31,3 +31,6 @@ export const MAX_INGREDIENT_ITEM_LENGTH = 200
 export const MAX_INGREDIENT_UNIT_LENGTH = 40
 export const MAX_RECIPE_INGREDIENTS = 100
 export const MAX_RECIPE_TAG_LENGTH = 40
+
+// Recipes a non-admin may have awaiting review at once. Admins are exempt.
+export const MAX_PENDING_PER_USER = 5

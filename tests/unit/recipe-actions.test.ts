@@ -1,13 +1,14 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import mongoose, { Types } from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
-import { adminId, day, pendingDoc, recipeDoc } from '../fixtures/recipes'
+import { adminId, day, pendingDoc, recipeDoc, rejectedDoc } from '../fixtures/recipes'
+import { MAX_PENDING_PER_USER } from '../../lib/constants'
 import { signUploadParams } from '../../lib/uploadSignature'
 import { ALLOWED_FORMATS, MAX_UPLOAD_BYTES, UPLOAD_FOLDER, UPLOAD_TRANSFORMATION } from '../../lib/uploads'
 
 // The server actions in app/recipes/actions.ts against an in-memory MongoDB
 // and the real recipe model. Only the session (auth.ts pulls in next-auth),
-// next/navigation (imported by lib/adminGuard) and Cloudinary (global fetch)
+// next/navigation (imported by lib/guards) and Cloudinary (global fetch)
 // are faked.
 
 const { auth } = vi.hoisted(() => ({ auth: vi.fn() }))
@@ -44,7 +45,8 @@ const sessionFor = (role: 'user' | 'admin', id: Types.ObjectId) => ({
 // submittedBy can be told apart from one overwritten with the current user.
 const actingAdminId = new Types.ObjectId('64b0000000000000000000aa')
 const adminSession = sessionFor('admin', actingAdminId)
-const userSession = sessionFor('user', new Types.ObjectId('64b0000000000000000000bb'))
+const userId = new Types.ObjectId('64b0000000000000000000bb')
+const userSession = sessionFor('user', userId)
 
 const unauthorized = [
   { label: 'no session', session: null },
@@ -161,24 +163,39 @@ async function sentRequest() {
   return { url: request.url, method: request.method, form: await request.formData() }
 }
 
-describe('every action rejects callers who are not admins', () => {
+describe('every action rejects callers with no session', () => {
+  beforeEach(async () => {
+    await seed(recipeDoc({ slug: 'beef-stew' }))
+    auth.mockResolvedValue(null)
+  })
+
+  it('createRecipe throws and writes nothing', async () => {
+    const before = await allRecipes()
+    await expect(actions.createRecipe(validInput({ name: 'Lamb Stew' }))).rejects.toThrow()
+    expect(await allRecipes()).toEqual(before)
+  })
+
+  it('createRecipe throws before validating, so invalid input gets no field errors', async () => {
+    await expect(actions.createRecipe({})).rejects.toThrow()
+  })
+
+  it('uploadRecipeImage throws, uploads nothing and writes nothing', async () => {
+    fetchMock.mockImplementation(async () => cloudinaryOk())
+    const before = await allRecipes()
+    await expect(actions.uploadRecipeImage(formWith(pngFile()))).rejects.toThrow()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(await allRecipes()).toEqual(before)
+  })
+})
+
+describe('updateRecipe rejects callers who are not admins', () => {
   describe.each(unauthorized)('with $label', ({ session }) => {
     beforeEach(async () => {
       await seed(recipeDoc({ slug: 'beef-stew' }))
       auth.mockResolvedValue(session)
     })
 
-    it('createRecipe throws and writes nothing', async () => {
-      const before = await allRecipes()
-      await expect(actions.createRecipe(validInput({ name: 'Lamb Stew' }))).rejects.toThrow()
-      expect(await allRecipes()).toEqual(before)
-    })
-
-    it('createRecipe throws before validating, so invalid input gets no field errors', async () => {
-      await expect(actions.createRecipe({})).rejects.toThrow()
-    })
-
-    it('updateRecipe throws and leaves the recipe unchanged', async () => {
+    it('throws and leaves the recipe unchanged', async () => {
       const before = await allRecipes()
       const id = String(before[0]._id)
       await expect(
@@ -187,16 +204,8 @@ describe('every action rejects callers who are not admins', () => {
       expect(await allRecipes()).toEqual(before)
     })
 
-    it('updateRecipe throws before checking the id', async () => {
+    it('throws before checking the id', async () => {
       await expect(actions.updateRecipe('not-an-id', validInput({ slug: 'x' }))).rejects.toThrow()
-    })
-
-    it('uploadRecipeImage throws, uploads nothing and writes nothing', async () => {
-      fetchMock.mockImplementation(async () => cloudinaryOk())
-      const before = await allRecipes()
-      await expect(actions.uploadRecipeImage(formWith(pngFile()))).rejects.toThrow()
-      expect(fetchMock).not.toHaveBeenCalled()
-      expect(await allRecipes()).toEqual(before)
     })
   })
 })
@@ -286,6 +295,101 @@ describe('createRecipe', () => {
 
     expect(result).toEqual({ ok: false, fieldErrors: expect.objectContaining({ slug: messages }) })
     expect(await allRecipes()).toEqual(before)
+  })
+})
+
+describe('createRecipe for a signed-in user who is not an admin', () => {
+  beforeEach(() => {
+    auth.mockResolvedValue(userSession)
+  })
+
+  it('saves a pending recipe with no publishedAt, owned by the user', async () => {
+    const result = await actions.createRecipe(validInput({ name: 'Mac & Cheese' }))
+
+    expect(result).toEqual({ ok: true, slug: 'mac-and-cheese' })
+    const saved = await stored({ slug: 'mac-and-cheese' })
+    expect(saved).toMatchObject({ name: 'Mac & Cheese', status: 'pending' })
+    expect(saved).not.toHaveProperty('publishedAt')
+    expect(saved!.submittedBy.equals(userId)).toBe(true)
+  })
+
+  it('ignores a client-supplied status and publishedAt', async () => {
+    await actions.createRecipe(validInput({ status: 'published', publishedAt: '2024-01-05T00:00:00.000Z' }))
+    const saved = await stored({ slug: 'beef-stew' })
+    expect(saved).toMatchObject({ status: 'pending' })
+    expect(saved).not.toHaveProperty('publishedAt')
+  })
+})
+
+describe('the pending cap', () => {
+  // `count` pending recipes submitted by `submittedBy`, with distinct slugs.
+  async function seedPending(count: number, submittedBy = userId) {
+    for (let n = 1; n <= count; n++) await seed(pendingDoc({ slug: `pending-${n}`, submittedBy }))
+  }
+
+  it('is 5', () => {
+    expect(MAX_PENDING_PER_USER).toBe(5)
+  })
+
+  it('lets a user submit their 5th pending recipe', async () => {
+    auth.mockResolvedValue(userSession)
+    await seedPending(MAX_PENDING_PER_USER - 1)
+    expect(await actions.createRecipe(validInput())).toEqual({ ok: true, slug: 'beef-stew' })
+  })
+
+  it('refuses a 6th with a form error and writes nothing', async () => {
+    auth.mockResolvedValue(userSession)
+    await seedPending(MAX_PENDING_PER_USER)
+    const before = await allRecipes()
+
+    const result = await actions.createRecipe(validInput())
+
+    expect(result).toEqual({
+      ok: false,
+      formError: "You have 5 recipes waiting for review. You can submit more once they've been reviewed.",
+    })
+    expect(await allRecipes()).toEqual(before)
+  })
+
+  it('does not apply to admins', async () => {
+    await seedPending(MAX_PENDING_PER_USER, actingAdminId)
+    expect(await actions.createRecipe(validInput())).toEqual({ ok: true, slug: 'beef-stew' })
+  })
+
+  it("counts only the user's own pending recipes, not published, rejected or other users' ones", async () => {
+    auth.mockResolvedValue(userSession)
+    await seedPending(MAX_PENDING_PER_USER - 1)
+    await seed(recipeDoc({ slug: 'published-1', submittedBy: userId }))
+    await seed(rejectedDoc({ slug: 'rejected-1', submittedBy: userId }))
+    await seed(pendingDoc({ slug: 'someone-elses', submittedBy: adminId }))
+    expect(await actions.createRecipe(validInput())).toEqual({ ok: true, slug: 'beef-stew' })
+  })
+
+  it('refuses an upload at the cap with the same message, without calling Cloudinary', async () => {
+    auth.mockResolvedValue(userSession)
+    fetchMock.mockImplementation(async () => cloudinaryOk())
+    await seedPending(MAX_PENDING_PER_USER)
+
+    const result = await actions.uploadRecipeImage(formWith(pngFile()))
+
+    expect(result).toEqual({
+      ok: false,
+      error: "You have 5 recipes waiting for review. You can submit more once they've been reviewed.",
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('lets a user under the cap upload', async () => {
+    auth.mockResolvedValue(userSession)
+    fetchMock.mockImplementation(async () => cloudinaryOk())
+    await seedPending(MAX_PENDING_PER_USER - 1)
+    expect(await actions.uploadRecipeImage(formWith(pngFile()))).toEqual({ ok: true, publicId: 'recipes/abc123' })
+  })
+
+  it('does not stop an admin uploading', async () => {
+    fetchMock.mockImplementation(async () => cloudinaryOk())
+    await seedPending(MAX_PENDING_PER_USER, actingAdminId)
+    expect(await actions.uploadRecipeImage(formWith(pngFile()))).toEqual({ ok: true, publicId: 'recipes/abc123' })
   })
 })
 

@@ -10,7 +10,6 @@ import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
 import RecipeSearch from './RecipeSearch'
 import ThemeToggle from './ThemeToggle'
-import { isAdmin } from '../lib/roles'
 import { NAV_LINKS } from '../lib/constants'
 import type { RecipeSearchOption } from '../lib/recipes/queries'
 import type { Theme } from '../lib/theme'
@@ -51,10 +50,10 @@ export default function SiteHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [currentTheme, setCurrentTheme] = useState(theme)
   const pathname = usePathname()
-  // Hidden while the session loads, so non-admins never see admin links.
-  const admin = isAdmin(useSession().data)
+  // Hidden while the session loads, so signed-out visitors never see them.
+  const signedIn = Boolean(useSession().data)
   const links = NAV_LINKS.filter(
-    (item) => admin || !('adminOnly' in item && item.adminOnly)
+    (item) => signedIn || !('signedInOnly' in item && item.signedInOnly)
   ).map((item) => ({ ...item, active: isActive(item.href, pathname) }))
   const closeMenu = () => setMobileMenuOpen(false)
 

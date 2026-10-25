@@ -7,6 +7,7 @@ const FLASH_MAX_AGE_SECONDS = 60
 
 const FLASH_MESSAGES = {
   saved: 'Recipe saved',
+  submitted: 'Recipe submitted for review',
 } as const
 
 export type FlashKey = keyof typeof FLASH_MESSAGES

@@ -5,7 +5,8 @@ import { disconnect, reseed } from './db.ts'
 import { seedRecipe, type SeedRecipe } from './fixtures.ts'
 
 // Every page renders the same site header. Each test below runs once per
-// page; /new and the edit page are admin-only, so they run signed in as admin.
+// page, in the least privileged session the page allows: /new needs a user,
+// the edit page an admin.
 
 test.beforeEach(async () => {
   await reseed()
@@ -23,7 +24,7 @@ const sitePages: { path: string; sessions: Session[] }[] = [
   { path: '/', sessions: ['signed out', 'user', 'admin'] },
   { path: '/recipes', sessions: ['signed out', 'user', 'admin'] },
   { path: `/recipes/${stew.slug}`, sessions: ['signed out', 'user', 'admin'] },
-  { path: '/new', sessions: ['admin'] },
+  { path: '/new', sessions: ['user', 'admin'] },
   { path: `/recipes/${stew.slug}/edit`, sessions: ['admin'] },
 ]
 
@@ -82,7 +83,7 @@ for (const { path, sessions } of sitePages) {
         continue
       }
 
-      test(`signed in as ${as}, shows the email and Sign out, and Add Recipe only for admins`, async ({
+      test(`signed in as ${as}, shows the email, Sign out and Add Recipe`, async ({
         context,
         page,
       }) => {
@@ -94,13 +95,9 @@ for (const { path, sessions } of sitePages) {
           page.getByText(emailFor(as), { exact: true }).filter({ visible: true })
         ).toBeVisible()
         await expect(visibleButton(page, 'Sign in')).toHaveCount(0)
-        if (as === 'admin') {
-          await expect(
-            page.getByRole('navigation').getByRole('link', { name: 'Add Recipe' })
-          ).toBeVisible()
-        } else {
-          await expect(page.getByRole('link', { name: 'Add Recipe' })).toHaveCount(0)
-        }
+        await expect(
+          page.getByRole('navigation').getByRole('link', { name: 'Add Recipe' })
+        ).toBeVisible()
       })
     }
 
@@ -168,7 +165,7 @@ for (const { path, sessions } of sitePages) {
           })
         ).toBeVisible()
         await expect(dialog.getByRole('link', { name: 'Add Recipe' })).toHaveCount(
-          session === 'admin' ? 1 : 0
+          session === 'signed out' ? 0 : 1
         )
         await expect(dialog.getByRole('button', { name: 'Close menu' })).toBeFocused()
       })

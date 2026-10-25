@@ -14,7 +14,7 @@ import {
   type SaveResult,
   type UploadResult,
 } from '../app/recipes/actions'
-import { flashCookie } from '../lib/flash'
+import { flashCookie, type FlashKey } from '../lib/flash'
 import { parseIngredient } from '../lib/ingredients'
 import { recipeInputSchema } from '../lib/recipes/input'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
@@ -162,25 +162,29 @@ function Card({ id, title, children }: { id: string; title: string; children: Re
   )
 }
 
-// Has the next page show "Recipe saved" (components/Toaster.tsx). Set here,
-// not in the action: a cookie set by a server action makes Next re-render this page too.
-function flashSaved() {
-  document.cookie = flashCookie('saved')
+// Has the next page show the toast (components/Toaster.tsx). Set here, not
+// in the action: a cookie set by a server action makes Next re-render this page too.
+function setFlash(key: FlashKey) {
+  document.cookie = flashCookie(key)
 }
 
 // Creates a recipe, or with `recipeId` edits that recipe (and its slug).
+// A recipe a non-admin creates waits for review, and the labels say so.
 // Images upload through the uploadRecipeImage action as soon as one is chosen.
 // `imageUrlPrefix` (recipeImageUrlPrefix) plus a public ID is the preview's Cloudinary URL.
 export default function RecipeForm({
+  admin,
   recipeId,
   initialValues = EMPTY_VALUES,
   imageUrlPrefix,
 }: {
+  admin: boolean
   recipeId?: string
   initialValues?: RecipeFormValues
   imageUrlPrefix: string
 }) {
   const router = useRouter()
+  const forReview = !recipeId && !admin
   const [uploaded, setUploaded] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -232,7 +236,7 @@ export default function RecipeForm({
       return setError('root.server', { message: SAVE_FAILED })
     }
     if (result.ok) {
-      flashSaved()
+      setFlash(forReview ? 'submitted' : 'saved')
       return router.push(`/recipes/${result.slug}`)
     }
     if ('formError' in result) return setError('root.server', { message: result.formError })
@@ -287,6 +291,7 @@ export default function RecipeForm({
       <p className="mt-2 text-muted">
         {recipeId ? 'Change any field and save the recipe.' : 'Please fill out the form to add a new recipe.'}
       </p>
+      {forReview && <p className="mt-1 text-sm text-muted">Submissions are reviewed before they appear publicly.</p>}
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit(save, (invalid) => showInvalid(Object.keys(invalid)))} noValidate>
         <Card id="basics" title="Basics">
@@ -522,7 +527,7 @@ export default function RecipeForm({
               disabled={isSubmitting || uploading}
               className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-on-primary shadow-xs hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save recipe
+              {forReview ? 'Submit for review' : 'Save recipe'}
             </button>
           </div>
         </div>

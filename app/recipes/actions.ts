@@ -2,13 +2,16 @@
 
 import { isObjectIdOrHexString, mongo, Types } from 'mongoose'
 import { z } from 'zod'
-import { requireAdminSession } from '../../lib/adminGuard'
+import type { Session } from 'next-auth'
+import { MAX_PENDING_PER_USER } from '../../lib/constants'
+import { requireAdminSession, requireUserSession } from '../../lib/guards'
 import dbConnect from '../../lib/dbConnect'
 import { requireEnv } from '../../lib/env'
 import { IMAGE_HEADER_BYTES, matchesImageType } from '../../lib/imageType'
 import { recipeInputSchema } from '../../lib/recipes/input'
 import { Recipe } from '../../lib/recipes/model'
 import { uniqueSlug } from '../../lib/recipes/slug'
+import { isAdmin } from '../../lib/roles'
 import { SLUG_PATTERN } from '../../lib/slugify'
 import { signUploadParams } from '../../lib/uploadSignature'
 import {
@@ -20,7 +23,8 @@ import {
 } from '../../lib/uploads'
 
 // Write path for recipes. Server actions are public POST endpoints, so every
-// action checks the admin session itself, before anything else.
+// action checks the session itself, before anything else. Any signed-in user
+// may submit a recipe; a non-admin's waits for review.
 
 export type FieldErrors = Record<string, string[]>
 
@@ -37,8 +41,19 @@ const UPLOAD_TIMEOUT_MS = 30_000
 
 const SLUG_TAKEN: SaveResult = { ok: false, fieldErrors: { slug: ['another recipe already uses this slug'] } }
 
+const PENDING_CAP_MESSAGE = `You have ${MAX_PENDING_PER_USER} recipes waiting for review. You can submit more once they've been reviewed.`
+
 function fieldErrorsOf(error: z.ZodError): SaveResult {
   return { ok: false, fieldErrors: z.flattenError(error).fieldErrors as FieldErrors }
+}
+
+// Whether a non-admin already has as many recipes awaiting review as allowed.
+// Two submissions at once can both pass; the cap is a speed bump, not a lock.
+async function atPendingCap(session: Session): Promise<boolean> {
+  if (isAdmin(session)) return false
+  await dbConnect()
+  const pending = await Recipe.countDocuments({ submittedBy: new Types.ObjectId(session.user.id), status: 'pending' })
+  return pending >= MAX_PENDING_PER_USER
 }
 
 // The unique slug index rejected a write: another recipe took the slug after it was checked.
@@ -46,20 +61,23 @@ function isDuplicateSlug(error: unknown): boolean {
   return error instanceof mongo.MongoServerError && error.code === 11000 && 'slug' in (error.keyPattern ?? {})
 }
 
+// An admin's recipe publishes at once; anyone else's is pending, with no publishedAt.
 export async function createRecipe(input: unknown): Promise<SaveResult> {
-  const session = await requireAdminSession()
+  const session = await requireUserSession()
+  if (await atPendingCap(session)) return { ok: false, formError: PENDING_CAP_MESSAGE }
   const parsed = recipeInputSchema.safeParse(input)
   if (!parsed.success) return fieldErrorsOf(parsed.error)
 
   await dbConnect()
   const slug = await uniqueSlug(parsed.data.name)
+  const admin = isAdmin(session)
   try {
     await Recipe.create({
       ...parsed.data,
       slug,
       submittedBy: new Types.ObjectId(session.user.id),
-      status: 'published',
-      publishedAt: new Date(),
+      status: admin ? 'published' : 'pending',
+      publishedAt: admin ? new Date() : undefined,
     })
   } catch (error) {
     if (isDuplicateSlug(error)) return SLUG_TAKEN
@@ -99,9 +117,11 @@ export async function updateRecipe(id: string, input: unknown): Promise<SaveResu
 
 // Checks size and type (declared MIME type and magic bytes), then uploads to
 // Cloudinary with a signed request from the server. Cloudinary's response
-// body is never returned or logged, since it can echo the signature.
+// body is never returned or logged, since it can echo the signature. A
+// non-admin at the pending cap couldn't save the recipe, so can't upload either.
 export async function uploadRecipeImage(formData: FormData): Promise<UploadResult> {
-  await requireAdminSession()
+  const session = await requireUserSession()
+  if (await atPendingCap(session)) return { ok: false, error: PENDING_CAP_MESSAGE }
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'Please choose an image file.' }
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: UPLOAD_TOO_LARGE_MESSAGE }

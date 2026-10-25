@@ -4,22 +4,21 @@ import { auth } from '../auth'
 import RecipeCard from '../components/RecipeCard'
 import type { RecipeCardRecord } from '../lib/recipes/listing'
 import { latestPublished } from '../lib/recipes/queries'
-import { isAdmin } from '../lib/roles'
 
 const heroImage = '/images/llama.webp'
 
 export default async function HomePage() {
   const [session, recipes] = await Promise.all([auth(), latestPublished(4)])
-  const admin = isAdmin(session)
+  const signedIn = session !== null
   return (
     <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
-      <Hero admin={admin} />
-      <LatestRecipes recipes={recipes} admin={admin} />
+      <Hero signedIn={signedIn} />
+      <LatestRecipes recipes={recipes} signedIn={signedIn} />
     </div>
   )
 }
 
-function Hero({ admin }: { admin: boolean }) {
+function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section className="grid items-center gap-12 py-12 sm:py-16 lg:grid-cols-2 lg:gap-16 lg:py-24">
       <div className="max-w-xl">
@@ -37,7 +36,7 @@ function Hero({ admin }: { admin: boolean }) {
           >
             Browse recipes
           </Link>
-          {admin && (
+          {signedIn && (
             <Link
               href="/new"
               className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface px-5 text-base font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft"
@@ -65,7 +64,7 @@ function Hero({ admin }: { admin: boolean }) {
 }
 
 // `recipes` arrive newest first, already limited to the latest few.
-function LatestRecipes({ recipes, admin }: { recipes: RecipeCardRecord[]; admin: boolean }) {
+function LatestRecipes({ recipes, signedIn }: { recipes: RecipeCardRecord[]; signedIn: boolean }) {
   return (
     <section aria-labelledby="latest-heading" className="border-t border-border pt-12 sm:pt-16">
       <div className="flex items-baseline justify-between gap-x-4">
@@ -83,7 +82,7 @@ function LatestRecipes({ recipes, admin }: { recipes: RecipeCardRecord[]; admin:
       {recipes.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
           <p className="text-base text-muted">No recipes yet.</p>
-          {admin && (
+          {signedIn && (
             <Link href="/new" className="mt-4 inline-block font-semibold text-accent hover:underline">
               Add the first recipe
             </Link>

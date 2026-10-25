@@ -81,13 +81,15 @@ test.describe('home page', () => {
     await expect(page.getByRole('link', { name: 'Add the first recipe' })).toHaveCount(0)
   })
 
-  test('with no recipes, offers admins a link to add the first one', async ({ context, page }) => {
-    await deleteAllRecipes()
-    await signInAs(context, { email: 'admin@example.com', role: 'admin' })
-    await page.goto('/')
+  for (const role of ['user', 'admin'] as const) {
+    test(`with no recipes, offers a signed-in ${role} a link to add the first one`, async ({ context, page }) => {
+      await deleteAllRecipes()
+      await signInAs(context, { email: `${role}@example.com`, role })
+      await page.goto('/')
 
-    await expect(page.getByRole('link', { name: 'Add the first recipe' })).toHaveAttribute('href', '/new')
-  })
+      await expect(page.getByRole('link', { name: 'Add the first recipe' })).toHaveAttribute('href', '/new')
+    })
+  }
 })
 
 for (const path of ['/', '/recipes', `/recipes/${publishedRecipes[0].slug}`]) {

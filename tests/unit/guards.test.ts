@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// lib/adminGuard.ts reads the session through the repo-root auth.ts, which
+// lib/guards.ts reads the session through the repo-root auth.ts, which
 // pulls in next-auth (not loadable under Vitest), and calls next/navigation.
 // Both are replaced at the module boundary.
 const { auth } = vi.hoisted(() => ({ auth: vi.fn() }))
@@ -18,7 +18,7 @@ const { redirect, notFound } = vi.hoisted(() => ({
 }))
 vi.mock('next/navigation', () => ({ redirect, notFound }))
 
-import { requireAdminPage, requireAdminSession } from '../../lib/adminGuard'
+import { requireAdminPage, requireAdminSession, requireUserPage, requireUserSession } from '../../lib/guards'
 
 const sessionFor = (role: 'user' | 'admin') => ({
   expires: '2999-01-01T00:00:00.000Z',
@@ -31,6 +31,23 @@ beforeEach(() => {
   auth.mockReset()
   redirect.mockClear()
   notFound.mockClear()
+})
+
+describe('requireUserSession', () => {
+  it('throws when there is no session, without redirecting or 404ing', async () => {
+    auth.mockResolvedValue(null)
+    await expect(requireUserSession()).rejects.toThrow()
+    expect(redirect).not.toHaveBeenCalled()
+    expect(notFound).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a user', userSession],
+    ['an admin', adminSession],
+  ])('returns the session for %s', async (_label, session) => {
+    auth.mockResolvedValue(session)
+    await expect(requireUserSession()).resolves.toEqual(session)
+  })
 })
 
 describe('requireAdminSession', () => {
@@ -54,6 +71,25 @@ describe('requireAdminSession', () => {
     await expect(requireAdminSession()).rejects.toThrow()
     auth.mockResolvedValue(userSession)
     await expect(requireAdminSession()).rejects.toThrow()
+    expect(redirect).not.toHaveBeenCalled()
+    expect(notFound).not.toHaveBeenCalled()
+  })
+})
+
+describe('requireUserPage', () => {
+  it('redirects a signed-out visitor to sign-in with the page as callbackUrl', async () => {
+    auth.mockResolvedValue(null)
+    await expect(requireUserPage('/new')).rejects.toMatchObject({ digest: expect.stringMatching(/^NEXT_REDIRECT;/) })
+    expect(redirect).toHaveBeenCalledExactlyOnceWith('/api/auth/signin?callbackUrl=%2Fnew')
+    expect(notFound).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a user', userSession],
+    ['an admin', adminSession],
+  ])('returns the session for %s without redirecting or 404ing', async (_label, session) => {
+    auth.mockResolvedValue(session)
+    await expect(requireUserPage('/new')).resolves.toEqual(session)
     expect(redirect).not.toHaveBeenCalled()
     expect(notFound).not.toHaveBeenCalled()
   })
