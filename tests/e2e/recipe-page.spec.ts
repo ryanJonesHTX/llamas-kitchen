@@ -1,9 +1,10 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './test.ts'
-import { disconnect, reseed } from './db.ts'
+import { listingHref } from '../../lib/recipes/listingHref.ts'
+import { disconnect, insertRecipes, reseed } from './db.ts'
 import { hiddenRecipes, pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe, seedRecipes } from './fixtures.ts'
 import { signInAs } from './auth.ts'
-import { factTerms, factValues, ingredientItems, stepsList, stepTexts, tagItems } from './recipePage.ts'
+import { factTerms, factValues, ingredientItems, stepsList, stepTexts, tagItems, tagLinks } from './recipePage.ts'
 
 // The recipe page, /recipes/<slug>: published recipes for everyone; pending
 // and rejected ones only for their submitter and admins.
@@ -184,12 +185,17 @@ test.describe('the ingredient checklist', () => {
     await expect(beef(page)).not.toBeChecked()
   })
 
-  // The skip link jumps past the header; the first ingredient is the next stop.
+  // The skip link jumps past the header; the tag links come next, then the first ingredient.
   test('Tab reaches a checkbox and Space toggles it', async ({ page }) => {
-    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+    const stew = seedRecipe('E2E Beef Stew')
+    await page.goto(`/recipes/${stew.slug}`)
 
     await page.keyboard.press('Tab')
     await page.keyboard.press('Enter')
+    for (const index of stew.tags.keys()) {
+      await page.keyboard.press('Tab')
+      await expect(tagLinks(page).nth(index)).toBeFocused()
+    }
     await page.keyboard.press('Tab')
     await expect(beef(page)).toBeFocused()
 
@@ -200,7 +206,7 @@ test.describe('the ingredient checklist', () => {
   })
 })
 
-test('printing hides the site header and checkboxes, keeps ingredients and steps, and uses light colors in dark mode', async ({
+test('printing hides the site header and checkboxes, keeps ingredients, steps and plain-text tags, and uses light colors in dark mode', async ({
   context,
   page,
 }) => {
@@ -217,7 +223,76 @@ test('printing hides the site header and checkboxes, keeps ingredients and steps
   await expect(ingredientItems(page).getByRole('checkbox').first()).toBeHidden()
   await expect(stepTexts(page)).toHaveText(stew.steps)
   await expect(stepTexts(page).first()).toBeVisible()
+  await expect(tagItems(page)).toHaveText(stew.tags)
+  await expect(tagLinks(page).first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(247, 245, 250)')
+})
+
+test.describe('the tag links', () => {
+  const tagLink = (page: Page, tag: string) => page.getByRole('link', { name: `Recipes tagged ${tag}`, exact: true })
+  const tagHref = (tag: string) => listingHref({ tags: [tag], time: undefined, sort: 'newest', q: undefined })
+  const recipeGridNames = (page: Page) =>
+    page.getByRole('region', { name: 'Recipes', exact: true }).getByRole('heading', { level: 3 })
+
+  test('each tag links to the list filtered by it, named with its context', async ({ page }) => {
+    const stew = seedRecipe('E2E Beef Stew')
+
+    await page.goto(`/recipes/${stew.slug}`)
+
+    await expect(tagLinks(page)).toHaveCount(stew.tags.length)
+    for (const tag of stew.tags) {
+      await expect(tagLink(page, tag)).toHaveAttribute('href', tagHref(tag))
+    }
+    await expect(tagLink(page, 'beef')).toHaveAttribute('href', '/recipes?tag=beef')
+  })
+
+  // The pending recipe is tagged beef too, but the list only shows published recipes.
+  test('clicking a tag shows the list filtered by it, with its checkbox checked', async ({ page }) => {
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+    await tagLink(page, 'beef').click()
+
+    await expect(page).toHaveURL('/recipes?tag=beef')
+    await expect(recipeGridNames(page)).toHaveText(['E2E Beef Burgers', 'E2E Beef Stew'])
+    await page.getByRole('button', { name: 'Filters, 1 active', exact: true }).click()
+    await expect(page.getByRole('checkbox', { name: 'beef', exact: true })).toBeChecked()
+  })
+
+  test('a tag with a space and non-ASCII characters is encoded in the link', async ({ page }) => {
+    const tag = 'crème brûlée'
+    await insertRecipes([
+      {
+        ...seedRecipe('E2E Chicken Tacos'),
+        _id: '65c000000000000000000001',
+        name: 'E2E Crème Brûlée',
+        slug: 'e2e-creme-brulee',
+        tags: [tag],
+      },
+    ])
+
+    await page.goto('/recipes/e2e-creme-brulee')
+
+    await expect(tagLink(page, tag)).toHaveAttribute('href', '/recipes?tag=cr%C3%A8me+br%C3%BBl%C3%A9e')
+    await expect(tagLink(page, tag)).toHaveAttribute('href', tagHref(tag))
+
+    await tagLink(page, tag).click()
+
+    await expect(recipeGridNames(page)).toHaveText(['E2E Crème Brûlée'])
+    await page.getByRole('button', { name: 'Filters, 1 active', exact: true }).click()
+    await expect(page.getByRole('checkbox', { name: tag, exact: true })).toBeChecked()
+  })
+
+  // Below lg the 20px chip has a 44px target: a tap just above the chip still follows the link.
+  test('on a phone, a tap just outside the chip follows its link', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`/recipes/${seedRecipe('E2E Beef Stew').slug}`)
+
+    const box = (await tagLink(page, 'stew').boundingBox())!
+    expect(box.height).toBeLessThan(44)
+    await page.mouse.click(box.x + box.width / 2, box.y - 10)
+
+    await expect(page).toHaveURL('/recipes?tag=stew')
+  })
 })
 
 test.describe('the Edit link', () => {

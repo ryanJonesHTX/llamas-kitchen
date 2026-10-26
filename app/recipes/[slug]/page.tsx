@@ -10,6 +10,7 @@ import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
 import { formatMinutes } from '../../../lib/recipes/duration'
 import { formatIngredient } from '../../../lib/recipes/format'
 import { recipeImageUrl } from '../../../lib/recipes/image'
+import { listingHref } from '../../../lib/recipes/listingHref'
 import { canEdit, canView } from '../../../lib/recipes/permissions'
 import { getRecipeBySlug } from '../../../lib/recipes/queries'
 
@@ -46,11 +47,19 @@ export default async function RecipePage({ params }: Props) {
         {recipe.status !== 'published' && (
           <RecipeStatusBanner status={recipe.status} rejectionReason={recipe.rejectionReason} className="mb-6" />
         )}
+        {/* Each tag links to the list filtered by it. Below lg, an ::after overlay makes
+            the 20px chip a 44px target; gap-y-6 keeps stacked rows' targets apart. */}
         {recipe.tags.length > 0 && (
-          <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-1.5">
+          <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-x-1.5 gap-y-6 lg:gap-y-1.5 print:gap-x-3">
             {recipe.tags.map((tag) => (
-              <li key={tag} className="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-on-primary-soft">
-                {tag}
+              <li key={tag}>
+                <Link
+                  href={listingHref({ tags: [tag], time: undefined, sort: 'newest', q: undefined })}
+                  className="relative block rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-on-primary-soft after:absolute after:inset-x-0 after:-inset-y-3 hover:underline lg:after:hidden print:bg-transparent print:px-0 print:text-text print:no-underline"
+                >
+                  <span className="sr-only">Recipes tagged </span>
+                  <span>{tag}</span>
+                </Link>
               </li>
             ))}
           </ul>
