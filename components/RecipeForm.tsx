@@ -3,7 +3,7 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useFieldArray, useForm, useWatch, type FieldPath } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, useWatch, type FieldPath } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { CheckCircleIcon, PhotoIcon, PlusIcon } from '@heroicons/react/20/solid'
@@ -21,6 +21,7 @@ import type { RecipeStatus } from '../lib/recipes/model'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
 import RecipeStatusBanner from './RecipeStatusBanner'
 import { SortableIngredient, SortableIngredients } from './SortableIngredients'
+import TagInput from './TagInput'
 
 // The trimmed, non-blank pieces of `text`.
 function nonBlankParts(text: string, separator: string): string[] {
@@ -31,7 +32,7 @@ function nonBlankParts(text: string, separator: string): string[] {
 }
 
 // recipeInputSchema over the form's text fields: one ingredient per line
-// (blank lines skipped), one step per line, comma-separated tags. Its output
+// (blank lines skipped), one step per line. Tags are already a list. Its output
 // is the action input. The server checks the slug, so here it's any string.
 const recipeFormSchema = recipeInputSchema.extend({
   ingredients: z
@@ -42,10 +43,6 @@ const recipeFormSchema = recipeInputSchema.extend({
     .string()
     .transform((text) => nonBlankParts(text, '\n'))
     .pipe(recipeInputSchema.shape.steps),
-  tags: z
-    .string()
-    .transform((text) => nonBlankParts(text, ','))
-    .pipe(recipeInputSchema.shape.tags),
   slug: z.string().optional(),
 })
 
@@ -58,7 +55,7 @@ const EMPTY_VALUES: RecipeFormValues = {
   description: '',
   ingredients: [{ line: '' }],
   steps: '',
-  tags: '',
+  tags: [],
   servings: '',
   prepTime: '',
   cookTime: '',
@@ -175,6 +172,7 @@ function setFlash(key: FlashKey) {
 // rejection, waits for review, and the labels say so.
 // Images upload through the uploadRecipeImage action as soon as one is chosen.
 // `imageUrlPrefix` (recipeImageUrlPrefix) plus a public ID is the preview's Cloudinary URL.
+// `tagSuggestions` are the tags published recipes use (publishedTagsInUse).
 export default function RecipeForm({
   admin,
   recipeId,
@@ -182,6 +180,7 @@ export default function RecipeForm({
   rejectionReason,
   initialValues = EMPTY_VALUES,
   imageUrlPrefix,
+  tagSuggestions,
 }: {
   admin: boolean
   recipeId?: string
@@ -189,6 +188,7 @@ export default function RecipeForm({
   rejectionReason?: string
   initialValues?: RecipeFormValues
   imageUrlPrefix: string
+  tagSuggestions: string[]
 }) {
   const router = useRouter()
   const forReview = !recipeId && !admin
@@ -362,13 +362,25 @@ export default function RecipeForm({
             />
           </Field>
 
-          <Field id="tags" label="Tags" error={tagsError} help="Separate tags with commas.">
-            <input
-              id="tags"
-              type="text"
-              className={INPUT}
-              {...register('tags')}
-              {...errorProps('tags', tagsError)}
+          {/* TagInput shows the error, so its combobox can point to it. */}
+          <Field id="tags" label="Tags" error={undefined}>
+            <Controller
+              control={control}
+              name="tags"
+              render={({ field }) => (
+                <TagInput
+                  id="tags"
+                  tags={field.value}
+                  tagsInUse={tagSuggestions}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  inputRef={field.ref}
+                  inputClassName={INPUT}
+                  helpClassName={HELP}
+                  error={tagsError}
+                  errorClassName={ERROR}
+                />
+              )}
             />
           </Field>
         </Card>

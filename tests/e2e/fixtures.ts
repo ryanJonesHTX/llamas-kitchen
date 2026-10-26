@@ -153,7 +153,8 @@ export const pendingRecipe: SeedRecipe = {
   servings: 4,
   prepTime: 30,
   cookTime: 45,
-  tags: ['beef'],
+  // "pie" is on no other recipe, so a tag suggestion that leaks it shows.
+  tags: ['beef', 'pie'],
   imagePublicId: 'recipes/e2e-pending-beef-pie',
   submittedBy: SEED_SUBMITTER_ID,
   status: 'pending',

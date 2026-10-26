@@ -4,7 +4,7 @@ import { requireUserPage } from '../../../../lib/guards'
 import { formatIngredient } from '../../../../lib/recipes/format'
 import { recipeImageUrlPrefix } from '../../../../lib/recipes/image'
 import { canEdit } from '../../../../lib/recipes/permissions'
-import { getRecipeBySlug, type RecipeRecord } from '../../../../lib/recipes/queries'
+import { getRecipeBySlug, publishedTagsInUse, type RecipeRecord } from '../../../../lib/recipes/queries'
 import { isAdmin } from '../../../../lib/roles'
 
 // The form's text fields, filled from the stored recipe. sourceUrl and
@@ -16,7 +16,7 @@ function formValues(recipe: RecipeRecord): RecipeFormValues {
     description: recipe.description,
     ingredients: recipe.ingredients.map((ingredient) => ({ line: formatIngredient(ingredient) })),
     steps: recipe.steps.join('\n'),
-    tags: recipe.tags.join(', '),
+    tags: recipe.tags,
     servings: String(recipe.servings),
     prepTime: String(recipe.prepTime),
     cookTime: String(recipe.cookTime),
@@ -42,6 +42,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ slu
       rejectionReason={recipe.rejectionReason}
       initialValues={formValues(recipe)}
       imageUrlPrefix={recipeImageUrlPrefix('card')}
+      tagSuggestions={await publishedTagsInUse()}
     />
   )
 }

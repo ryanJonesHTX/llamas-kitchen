@@ -4,7 +4,7 @@ import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { deleteAllRecipes, disconnect, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
-import { saveButton } from './recipeForm.ts'
+import { addTags, saveButton, tagInput } from './recipeForm.ts'
 
 // axe-core over every page and state, in both themes. Serious and critical
 // violations fail the test; the message lists each rule and its targets.
@@ -120,6 +120,16 @@ const scenarios: Scenario[] = [
       await page.goto('/new')
       await saveButton(page).click()
       await expect(page.locator('[aria-invalid="true"]').first()).toBeVisible()
+    },
+  },
+  {
+    name: 'new recipe form with tag chips and the tag suggestions open',
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await page.goto('/new')
+      await addTags(page, ['beef', 'weeknight'])
+      await tagInput(page).fill('c')
+      await expect(page.getByRole('option', { name: 'chicken', exact: true })).toBeVisible()
     },
   },
   {

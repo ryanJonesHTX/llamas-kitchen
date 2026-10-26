@@ -34,6 +34,11 @@ const requiredText = z.string().trim().min(1)
 
 const atMost = (max: number) => `must be at most ${max} characters`
 
+// How every tag is stored: trimmed and lowercase. The tag input applies it as you type.
+export function normalizeTag(tag: string): string {
+  return tag.trim().toLowerCase()
+}
+
 // What a person or the import parser supplies. The server sets submittedBy,
 // status, rejectionReason, publishedAt and slug. Unknown keys are stripped, so
 // the parse output is the whitelist of fields input may write. A list entry's
@@ -69,7 +74,7 @@ export const recipeInputSchema = z.object({
   // De-duplicated after normalizing, keeping first-seen order; the limit counts distinct tags.
   tags: z
     .array(
-      z.string().trim().toLowerCase().min(1).max(MAX_RECIPE_TAG_LENGTH, `each tag must be at most ${MAX_RECIPE_TAG_LENGTH} characters`)
+      z.string().overwrite(normalizeTag).min(1).max(MAX_RECIPE_TAG_LENGTH, `each tag must be at most ${MAX_RECIPE_TAG_LENGTH} characters`)
     )
     .transform((tags) => [...new Set(tags)])
     .refine((tags) => tags.length <= MAX_RECIPE_TAGS, `at most ${MAX_RECIPE_TAGS} tags`),

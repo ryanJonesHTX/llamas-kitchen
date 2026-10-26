@@ -12,6 +12,23 @@ export const ingredientLine = (page: Page, n: number) => formField(page, `Ingred
 export const reorderHandle = (page: Page, n: number) =>
   page.getByRole('button', { name: `Reorder ingredient ${n}`, exact: true })
 
+// The tag input is a combobox labelled "Tags"; its chips are the "Selected tags" list.
+export const tagInput = (page: Page) => page.getByRole('combobox', { name: 'Tags', exact: true })
+
+export const tagChips = (page: Page) =>
+  page.getByRole('list', { name: 'Selected tags', exact: true }).getByRole('listitem')
+
+export const removeTagButton = (page: Page, tag: string) =>
+  page.getByRole('button', { name: `Remove tag ${tag}`, exact: true })
+
+// Types each tag and presses Enter, which adds it as a chip.
+export async function addTags(page: Page, tags: string[]): Promise<void> {
+  for (const tag of tags) {
+    await tagInput(page).fill(tag)
+    await tagInput(page).press('Enter')
+  }
+}
+
 // The file input is "Upload an image" until the form has an image, then "Replace image".
 export const imageInput = (page: Page) => formField(page, 'Upload an image')
 
@@ -42,7 +59,7 @@ export const newRecipe = {
   description: 'Layered pasta bake.',
   ingredients: ['12 lasagna sheets', '2 cups ricotta'],
   steps: ['Layer the sheets and sauce.', 'Bake for 45 minutes.'],
-  tags: 'Pasta, Bake',
+  tags: ['Pasta', 'Bake'],
   servings: '6',
   prepTime: '30',
   cookTime: '45',
@@ -58,7 +75,7 @@ export async function fillNewRecipe(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Add ingredient', exact: true }).click()
   await ingredientLine(page, 2).fill(newRecipe.ingredients[1])
   await formField(page, 'Steps').fill(newRecipe.steps.join('\n'))
-  await formField(page, 'Tags').fill(newRecipe.tags)
+  await addTags(page, newRecipe.tags)
   await formField(page, 'Servings').fill(newRecipe.servings)
   await formField(page, 'Prep time (minutes)').fill(newRecipe.prepTime)
   await formField(page, 'Cook time (minutes)').fill(newRecipe.cookTime)
