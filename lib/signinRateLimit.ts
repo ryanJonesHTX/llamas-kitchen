@@ -1,4 +1,5 @@
-// In-memory limits for magic-link sign-in emails. Production runs a single
+// In-memory limits for magic-link sign-in emails; createRateLimiter also
+// limits image uploads (app/recipes/actions.ts). Production runs a single
 // `next start` process, so per-process state is the whole picture.
 const WINDOW_MS = 15 * 60 * 1000
 const EMAIL_LIMIT = 5
@@ -10,7 +11,7 @@ type HitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number
 export function createRateLimiter({
   limit,
   windowMs,
-  now = Date.now,
+  now = () => Date.now(),
 }: {
   limit: number
   windowMs: number

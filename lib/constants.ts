@@ -38,3 +38,7 @@ export const MAX_PENDING_PER_USER = 5
 
 // The submitter sees the reason on their recipe page.
 export const MAX_REJECTION_REASON_LENGTH = 500
+
+// Image uploads a non-admin may make per window. Admins are exempt.
+export const UPLOAD_RATE_LIMIT = 20
+export const UPLOAD_RATE_WINDOW_MS = 60 * 60 * 1000

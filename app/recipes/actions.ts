@@ -4,7 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { Error as mongooseError, isObjectIdOrHexString, mongo, Types, type HydratedDocument } from 'mongoose'
 import { z } from 'zod'
 import type { Session } from 'next-auth'
-import { MAX_PENDING_PER_USER, MAX_REJECTION_REASON_LENGTH } from '../../lib/constants'
+import {
+  MAX_PENDING_PER_USER,
+  MAX_REJECTION_REASON_LENGTH,
+  UPLOAD_RATE_LIMIT,
+  UPLOAD_RATE_WINDOW_MS,
+} from '../../lib/constants'
 import { requireAdminSession, requireUserSession } from '../../lib/guards'
 import dbConnect from '../../lib/dbConnect'
 import { requireEnv } from '../../lib/env'
@@ -15,6 +20,7 @@ import { Recipe, type RecipeRecord } from '../../lib/recipes/model'
 import { canEdit } from '../../lib/recipes/permissions'
 import { uniqueSlug } from '../../lib/recipes/slug'
 import { isAdmin } from '../../lib/roles'
+import { createRateLimiter } from '../../lib/signinRateLimit'
 import { SLUG_PATTERN } from '../../lib/slugify'
 import { signUploadParams } from '../../lib/uploadSignature'
 import {
@@ -44,6 +50,9 @@ const recipeUpdateSchema = recipeInputSchema.extend({
 })
 
 const UPLOAD_TIMEOUT_MS = 30_000
+
+// Per non-admin user, in-process: production is a single `next start` process.
+const uploadLimiter = createRateLimiter({ limit: UPLOAD_RATE_LIMIT, windowMs: UPLOAD_RATE_WINDOW_MS })
 
 const SLUG_TAKEN: SaveResult = { ok: false, fieldErrors: { slug: ['another recipe already uses this slug'] } }
 
@@ -232,9 +241,17 @@ export async function rejectRecipe(id: string, updatedAt: number, reason: string
 // Checks size and type (declared MIME type and magic bytes), then uploads to
 // Cloudinary with a signed request from the server. Cloudinary's response
 // body is never returned or logged, since it can echo the signature. The
-// pending cap doesn't apply: an owner at the cap may still edit their recipe's image.
+// pending cap doesn't apply: an owner at the cap may still edit their recipe's
+// image. Non-admins are rate limited per user, before any file work.
 export async function uploadRecipeImage(formData: FormData): Promise<UploadResult> {
-  await requireUserSession()
+  const session = await requireUserSession()
+  if (!isAdmin(session)) {
+    const limited = uploadLimiter.hit(session.user.id)
+    if (!limited.allowed) {
+      const minutes = Math.max(1, Math.ceil(limited.retryAfterSeconds / 60))
+      return { ok: false, error: `Too many uploads. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.` }
+    }
+  }
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'Please choose an image file.' }
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: UPLOAD_TOO_LARGE_MESSAGE }

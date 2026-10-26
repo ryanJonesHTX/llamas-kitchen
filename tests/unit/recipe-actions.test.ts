@@ -2,7 +2,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import mongoose, { Types } from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import { adminId, day, pendingDoc, recipeDoc, rejectedDoc } from '../fixtures/recipes'
-import { MAX_PENDING_PER_USER, MAX_REJECTION_REASON_LENGTH } from '../../lib/constants'
+import {
+  MAX_PENDING_PER_USER,
+  MAX_REJECTION_REASON_LENGTH,
+  UPLOAD_RATE_LIMIT,
+  UPLOAD_RATE_WINDOW_MS,
+} from '../../lib/constants'
 import { signUploadParams } from '../../lib/uploadSignature'
 import { ALLOWED_FORMATS, MAX_UPLOAD_BYTES, UPLOAD_FOLDER, UPLOAD_TRANSFORMATION } from '../../lib/uploads'
 
@@ -1076,5 +1081,96 @@ describe('uploadRecipeImage', () => {
     }
     expect(Object.keys(success).sort()).toEqual(['ok', 'publicId'])
     expect(Object.keys(failure).sort()).toEqual(['error', 'ok'])
+  })
+})
+
+// A fixed window per non-admin user. The limiter is module state that
+// lives as long as the actions module, so each test signs in as its own user
+// and starts with an empty window. Date is faked; the limiter must read the
+// clock on every call (Date.now()), not hold a reference taken at import.
+describe('the upload rate limit', () => {
+  const start = new Date('2026-10-23T12:00:00.000Z')
+  let nextUser = 0x100
+
+  // A non-admin no other test has signed in as.
+  function signInAsNewUser(): Types.ObjectId {
+    const id = new Types.ObjectId(`64b0000000000000000${(nextUser++).toString(16).padStart(5, '0')}`)
+    auth.mockResolvedValue(sessionFor('user', id))
+    return id
+  }
+
+  const upload = () => actions.uploadRecipeImage(formWith(pngFile()))
+
+  async function uploadUpToTheLimit() {
+    for (let n = 0; n < UPLOAD_RATE_LIMIT; n++) expect(await upload()).toEqual({ ok: true, publicId: 'recipes/abc123' })
+  }
+
+  const tooMany = (minutes: number) => ({ ok: false, error: `Too many uploads. Try again in ${minutes} minutes.` })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(start)
+    fetchMock.mockImplementation(async () => cloudinaryOk())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('refuses a 21st upload within the hour without calling Cloudinary', async () => {
+    signInAsNewUser()
+    await uploadUpToTheLimit()
+    fetchMock.mockClear()
+
+    expect(await upload()).toEqual(tooMany(60))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses before looking at the file', async () => {
+    signInAsNewUser()
+    await uploadUpToTheLimit()
+
+    expect(await actions.uploadRecipeImage(new FormData())).toEqual(tooMany(60))
+  })
+
+  it('rounds the wait up to whole minutes', async () => {
+    signInAsNewUser()
+    await uploadUpToTheLimit()
+    // 29 min 59 s left in the window.
+    vi.setSystemTime(start.getTime() + 30 * 60 * 1000 + 1000)
+
+    expect(await upload()).toEqual(tooMany(30))
+  })
+
+  it('says at least 1 minute when less than a minute is left', async () => {
+    signInAsNewUser()
+    await uploadUpToTheLimit()
+    vi.setSystemTime(start.getTime() + UPLOAD_RATE_WINDOW_MS - 500)
+
+    expect(await upload()).toEqual({ ok: false, error: 'Too many uploads. Try again in 1 minute.' })
+  })
+
+  it('allows uploads again once the hour has passed', async () => {
+    signInAsNewUser()
+    await uploadUpToTheLimit()
+    vi.setSystemTime(start.getTime() + UPLOAD_RATE_WINDOW_MS)
+
+    expect(await upload()).toEqual({ ok: true, publicId: 'recipes/abc123' })
+  })
+
+  it("counts per user: one user at the limit doesn't block another", async () => {
+    signInAsNewUser()
+    await uploadUpToTheLimit()
+    expect(await upload()).toEqual(tooMany(60))
+
+    signInAsNewUser()
+    expect(await upload()).toEqual({ ok: true, publicId: 'recipes/abc123' })
+  })
+
+  it('does not apply to admins', async () => {
+    auth.mockResolvedValue(adminSession)
+    for (let n = 0; n <= UPLOAD_RATE_LIMIT + 5; n++) {
+      expect(await upload()).toEqual({ ok: true, publicId: 'recipes/abc123' })
+    }
   })
 })
