@@ -127,6 +127,27 @@ test('an unknown slug responds 404', async ({ page }) => {
   expect(response?.status()).toBe(404)
 })
 
+// A hidden recipe's 404 must not reveal that the slug exists. Next streams
+// the RSC rows in a varying order, so the bodies can't be compared byte for
+// byte; what would give it away is robots metadata a missing slug lacks.
+test.describe('a hidden recipe, signed out', () => {
+  const robotsMentions = (body: string) => body.split('robots').length - 1
+
+  for (const hidden of hiddenRecipes) {
+    test(`a ${hidden.status} recipe's 404 has the same robots metadata as a missing slug's`, async ({ request }) => {
+      const missing = 'e2e-no-such-recipe'
+      expect(seedRecipes.map((r) => r.slug)).not.toContain(missing)
+
+      const hiddenResponse = await request.get(`/recipes/${hidden.slug}`)
+      const missingResponse = await request.get(`/recipes/${missing}`)
+
+      expect(hiddenResponse.status()).toBe(404)
+      expect(missingResponse.status()).toBe(404)
+      expect(robotsMentions(await hiddenResponse.text())).toBe(robotsMentions(await missingResponse.text()))
+    })
+  }
+})
+
 test('prep, cook and total time show with units', async ({ page }) => {
   const stew = seedRecipe('E2E Beef Stew')
   expect([stew.prepTime, stew.cookTime]).toEqual([20, 120])

@@ -21,8 +21,10 @@ type Props = { params: Promise<{ slug: string }> }
 const loadRecipe = cache(getRecipeBySlug)
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const recipe = await loadRecipe((await params).slug)
-  return recipe && recipe.status !== 'published' ? { robots: { index: false } } : {}
+  // Only for a viewer who may see it, so a hidden recipe's 404 matches a missing
+  // slug's. The session is read either way, so both stream in the same order.
+  const [recipe, session] = await Promise.all([loadRecipe((await params).slug), auth()])
+  return recipe && recipe.status !== 'published' && canView(session, recipe) ? { robots: { index: false } } : {}
 }
 
 export default async function RecipePage({ params }: Props) {
