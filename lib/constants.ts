@@ -42,3 +42,7 @@ export const MAX_REJECTION_REASON_LENGTH = 500
 // Image uploads a non-admin may make per window. Admins are exempt.
 export const UPLOAD_RATE_LIMIT = 20
 export const UPLOAD_RATE_WINDOW_MS = 60 * 60 * 1000
+
+// Recipe search: the longest query in characters, and the most distinct words.
+export const MAX_SEARCH_QUERY_LENGTH = 100
+export const MAX_SEARCH_WORDS = 6

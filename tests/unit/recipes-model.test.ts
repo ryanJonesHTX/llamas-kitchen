@@ -336,17 +336,14 @@ describe('new Recipe indexes', () => {
         Object.fromEntries(Object.entries(options ?? {}).filter(([key]) => !key.startsWith('_'))),
       ])
 
-  it('declares exactly the indexes in the proposal', () => {
+  // Search uses word-prefix regexes (lib/recipes/search.ts), so there is no text index.
+  it('declares exactly the indexes in the proposal, minus the text index', () => {
     const expected = [
       [{ slug: 1 }, { unique: true }],
       [{ status: 1, publishedAt: -1, _id: -1 }, {}],
       [{ tags: 1, status: 1, publishedAt: -1, _id: -1 }, {}],
       [{ status: 1, createdAt: 1 }, {}],
       [{ submittedBy: 1, createdAt: -1 }, {}],
-      [
-        { name: 'text', 'ingredients.item': 'text', tags: 'text' },
-        { weights: { name: 10, 'ingredients.item': 5, tags: 3 } },
-      ],
     ]
     const indexes = declared()
     expect(indexes).toHaveLength(expected.length)

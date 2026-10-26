@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "migrate:recipes-v2": "node scripts/migrate-recipes-v2/index.ts",
     "migrate:image-folder": "node scripts/migrate-image-folder/index.ts",
-    "create-indexes": "node scripts/create-indexes.ts",
+    "sync-indexes": "node scripts/sync-indexes.ts",
     "check-recipe-data": "node scripts/check-recipe-data.ts"
   },
   "dependencies": {

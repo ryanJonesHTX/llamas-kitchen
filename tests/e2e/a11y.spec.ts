@@ -63,6 +63,20 @@ const scenarios: Scenario[] = [
     },
   },
   {
+    name: 'recipe list with a search',
+    open: async (page) => {
+      await page.goto('/recipes?q=chicken')
+      await expect(page.getByText('Results for “chicken”')).toBeVisible()
+    },
+  },
+  {
+    name: 'recipe list with a search that matches nothing',
+    open: async (page) => {
+      await page.goto('/recipes?q=zucchini')
+      await expect(page.getByText('No recipes match this search.')).toBeVisible()
+    },
+  },
+  {
     name: 'recipe page',
     open: async (page) => {
       await page.goto(`/recipes/${stew.slug}`)

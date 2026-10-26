@@ -1,9 +1,16 @@
 import { Types, type QueryFilter } from 'mongoose'
 import { z } from 'zod'
-import { RECIPE_PAGE_SIZE, RECIPE_SORT_OPTIONS, TIME_FILTERS } from '../constants'
+import {
+  MAX_SEARCH_QUERY_LENGTH,
+  MAX_SEARCH_WORDS,
+  RECIPE_PAGE_SIZE,
+  RECIPE_SORT_OPTIONS,
+  TIME_FILTERS,
+} from '../constants'
 import dbConnect from '../dbConnect'
 import { recipeInputSchema } from './input'
 import { Recipe, type RecipeRecord } from './model'
+import { searchFilter, searchWords } from './search'
 
 // The /recipes listing: its URL search params and the paged query behind them.
 
@@ -71,12 +78,28 @@ const afterParam = z
     return cursor
   })
 
+// The trimmed search text, or undefined when blank. Text with no words (only
+// punctuation) is still a search, one that matches nothing.
+const qParam = z
+  .string()
+  .optional()
+  .transform((value, ctx) => {
+    const text = value?.trim()
+    if (!text) return undefined
+    if (text.length > MAX_SEARCH_QUERY_LENGTH || searchWords(text).length > MAX_SEARCH_WORDS) {
+      ctx.addIssue({ code: 'custom', message: 'search too long' })
+      return z.NEVER
+    }
+    return text
+  })
+
 // Unknown params are stripped; single-valued params reject arrays.
 const listingParamsSchema = z.object({
   tag: tagsParam,
   time: z.literal(TIME_FILTERS.map((filter) => filter.value)).optional(),
   sort: z.literal(RECIPE_SORT_OPTIONS.map((option) => option.value)).default('newest'),
   after: afterParam,
+  q: qParam,
 })
 
 export type ListingQuery = {
@@ -84,20 +107,23 @@ export type ListingQuery = {
   time: (typeof TIME_FILTERS)[number]['value'] | undefined
   sort: (typeof RECIPE_SORT_OPTIONS)[number]['value']
   after: Cursor | undefined
+  q: string | undefined
 }
 
 // null when any known param is malformed; the page then 404s.
 export function parseListingParams(params: ListingSearchParams): ListingQuery | null {
   const parsed = listingParamsSchema.safeParse(params)
   if (!parsed.success) return null
-  const { tag, time, sort, after } = parsed.data
-  return { tags: tag, time, sort, after }
+  const { tag, time, sort, after, q } = parsed.data
+  return { tags: tag, time, sort, after, q }
 }
 
 // One page of published recipes, ordered by (publishedAt, _id) and continuing after query.after.
 export async function listPublished(query: ListingQuery, limit = RECIPE_PAGE_SIZE): Promise<ListingPage> {
   // Mongo reads a limit of 0 as no limit.
   if (!Number.isInteger(limit) || limit < 1) throw new Error(`listPublished: limit must be a positive integer, got ${limit}`)
+  const words = query.q === undefined ? [] : searchWords(query.q)
+  if (query.q !== undefined && words.length === 0) return { recipes: [], nextCursor: null }
   await dbConnect()
 
   const filter: QueryFilter<RecipeRecord> = { status: 'published' }
@@ -112,6 +138,8 @@ export async function listPublished(query: ListingQuery, limit = RECIPE_PAGE_SIZ
     const { publishedAt, _id } = query.after
     filter.$or = [{ publishedAt: { [op]: publishedAt } }, { publishedAt, _id: { [op]: _id } }]
   }
+  // In $and, so it can't clobber the cursor's $or.
+  if (words.length > 0) filter.$and = [searchFilter(words)]
 
   const found = await Recipe.find(filter, CARD_FIELDS)
     .sort({ publishedAt: direction, _id: direction })

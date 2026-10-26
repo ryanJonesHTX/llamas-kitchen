@@ -1,5 +1,5 @@
-// The recipe model from .claude/SCHEMA-PROPOSAL.md. Indexes are built by
-// scripts/create-indexes.ts, never automatically. Imported by that script
+// The recipe model from .claude/SCHEMA-PROPOSAL.md. Indexes are synced by
+// scripts/sync-indexes.ts, never automatically. Imported by that script
 // under Node type stripping, so imports carry .ts extensions.
 import mongoose, { type Types } from 'mongoose'
 import {
@@ -157,11 +157,6 @@ recipeSchema.index({ tags: 1, status: 1, publishedAt: -1, _id: -1 })
 // Moderation queue, oldest first.
 recipeSchema.index({ status: 1, createdAt: 1 })
 recipeSchema.index({ submittedBy: 1, createdAt: -1 })
-// Search filter. A text index can't be changed once built, so the weights are final.
-recipeSchema.index(
-  { name: 'text', 'ingredients.item': 'text', tags: 'text' },
-  { weights: { name: 10, 'ingredients.item': 5, tags: 3 } }
-)
 
 export const Recipe =
   (mongoose.models.Recipe as mongoose.Model<RecipeRecord> | undefined) ??

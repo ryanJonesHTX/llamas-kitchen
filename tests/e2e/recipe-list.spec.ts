@@ -1,10 +1,10 @@
 import type { Page } from '@playwright/test'
-import { RECIPE_PAGE_SIZE } from '../../lib/constants.ts'
+import { MAX_SEARCH_QUERY_LENGTH, MAX_SEARCH_WORDS, RECIPE_PAGE_SIZE } from '../../lib/constants.ts'
 import { expect, test } from './test.ts'
 import { disconnect, insertRecipes, reseed } from './db.ts'
 import { publishedRecipes, seedRecipe, type SeedRecipe } from './fixtures.ts'
 
-// The /recipes list: filters, sort and paging, all held in the URL.
+// The /recipes list: search, filters, sort and paging, all held in the URL.
 // Every test starts from exactly the seed fixtures; the paging tests add more.
 test.beforeEach(async () => {
   await reseed()
@@ -42,6 +42,15 @@ const moreRecipes = (page: Page) => page.getByRole('link', { name: 'More recipes
 async function sortBy(page: Page, option: 'Newest' | 'Oldest') {
   await page.getByRole('button', { name: /^Sort: / }).click()
   await page.getByRole('menuitem', { name: option }).click()
+}
+
+const searchBox = (page: Page) => page.getByRole('searchbox', { name: 'Search recipes' })
+const searchResultsFor = (page: Page, q: string) => page.getByText(`Results for “${q}”`, { exact: true })
+const clearSearch = (page: Page) => page.getByRole('link', { name: 'Clear search', exact: true })
+
+async function searchFor(page: Page, q: string) {
+  await searchBox(page).fill(q)
+  await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click()
 }
 
 // Matches /recipes with exactly these params, in any order. `true` means the
@@ -267,6 +276,9 @@ test.describe('recipe list', () => {
     'time=quick&time=long',
     'sort=oldest&sort=oldest',
     'tag=beef&tag=beef',
+    'q=chicken&q=curry',
+    `q=${'a'.repeat(MAX_SEARCH_QUERY_LENGTH + 1)}`,
+    `q=${Array.from({ length: MAX_SEARCH_WORDS + 1 }, (_, i) => `w${i}`).join('+')}`,
   ]) {
     test(`responds 404 for ?${query}`, async ({ page }) => {
       await expectNotFound(page, `/recipes?${query}`)
@@ -286,6 +298,128 @@ test.describe('recipe list', () => {
     await expect(page).toHaveURL(listingUrl())
     await expect(recipeGridNames(page)).toHaveText(newestFirst)
     await expect(page.getByText('No recipes match these filters.')).toHaveCount(0)
+  })
+})
+
+// Seed matches: "chicken" is in the Tacos and Curry names (and the hidden
+// rejected Chicken Bake); "thighs" is a Tacos ingredient.
+test.describe('recipe search', () => {
+  test('searching puts q in the URL, filters by word prefix and shows the query', async ({ page }) => {
+    await page.goto('/recipes')
+
+    await searchFor(page, 'chic thi')
+
+    await expect(page).toHaveURL(listingUrl({ q: 'chic thi' }))
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Tacos'])
+    await expect(searchResultsFor(page, 'chic thi')).toBeVisible()
+    await expect(searchBox(page)).toHaveValue('chic thi')
+  })
+
+  test('matches ingredients and tags as well as names, never hidden recipes', async ({ page }) => {
+    await page.goto('/recipes?q=coconut')
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Curry'])
+
+    await page.goto('/recipes?q=curry')
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Curry'])
+
+    await page.goto('/recipes?q=chicken')
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Curry', 'E2E Chicken Tacos'])
+  })
+
+  test('a new search keeps the filters and sort', async ({ page }) => {
+    await page.goto('/recipes?tag=chicken&tag=pork&sort=oldest')
+
+    await searchFor(page, 'chicken')
+
+    await expect(page).toHaveURL(listingUrl({ tag: ['chicken', 'pork'], sort: 'oldest', q: 'chicken' }))
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Tacos', 'E2E Chicken Curry'])
+  })
+
+  test('changing a filter or the sort keeps the search', async ({ page }) => {
+    await page.goto('/recipes?q=chicken')
+
+    await filtersButton(page, 0).click()
+    await page.getByRole('radio', { name: 'Total Time: > 1 Hour' }).click()
+    await expect(page).toHaveURL(listingUrl({ q: 'chicken', time: 'long' }))
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Curry'])
+
+    await page.getByRole('radio', { name: 'Total Time: ~1 Hour' }).click()
+    await expect(page).toHaveURL(listingUrl({ q: 'chicken', time: 'quick' }))
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Tacos'])
+
+    await sortBy(page, 'Oldest')
+    await expect(page).toHaveURL(listingUrl({ q: 'chicken', time: 'quick', sort: 'oldest' }))
+    await expect(searchResultsFor(page, 'chicken')).toBeVisible()
+    await expect(searchBox(page)).toHaveValue('chicken')
+  })
+
+  test('"Clear search" keeps the filters and sort', async ({ page }) => {
+    await page.goto('/recipes?q=chicken&tag=chicken&tag=beef&sort=oldest')
+    await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Tacos', 'E2E Chicken Curry'])
+
+    await clearSearch(page).click()
+
+    await expect(page).toHaveURL(listingUrl({ tag: ['chicken', 'beef'], sort: 'oldest' }))
+    await expect(recipeGridNames(page)).toHaveText([
+      'E2E Beef Stew',
+      'E2E Chicken Tacos',
+      'E2E Beef Burgers',
+      'E2E Chicken Curry',
+    ])
+    await expect(page.getByText(/^Results for/)).toHaveCount(0)
+    await expect(searchBox(page)).toHaveValue('')
+  })
+
+  test('a blank search shows every recipe', async ({ page }) => {
+    await page.goto('/recipes')
+
+    await searchFor(page, '   ')
+
+    await expect(recipeGridNames(page)).toHaveText(newestFirst)
+    await expect(page.getByText(/^Results for/)).toHaveCount(0)
+    await expect(clearSearch(page)).toHaveCount(0)
+  })
+
+  test('shows an empty state when nothing matches the search', async ({ page }) => {
+    await page.goto('/recipes')
+    await searchFor(page, 'zucchini')
+
+    await expect(page.getByText('No recipes match this search.')).toBeVisible()
+    await expect(searchResultsFor(page, 'zucchini')).toBeVisible()
+    await expect(recipeGridNames(page)).toHaveCount(0)
+
+    await page.getByRole('link', { name: 'Clear all', exact: true }).click()
+
+    await expect(page).toHaveURL(listingUrl())
+    await expect(recipeGridNames(page)).toHaveText(newestFirst)
+  })
+
+  test('the empty state names the filters when they are set too', async ({ page }) => {
+    await page.goto('/recipes?q=chicken&tag=pork')
+
+    await expect(page.getByText('No recipes match this search and these filters.')).toBeVisible()
+  })
+
+  test('punctuation alone is a search that matches nothing', async ({ page }) => {
+    const response = await page.goto('/recipes?q=%21%21%21')
+
+    expect(response?.status()).toBe(200)
+    await expect(page.getByText('No recipes match this search.')).toBeVisible()
+  })
+
+  // Only the form: the results stream in through Suspense, which needs
+  // JavaScript to replace the skeleton.
+  test.describe('without JavaScript', () => {
+    test.use({ javaScriptEnabled: false })
+
+    test('the search form submits the search, keeping the filters and sort', async ({ page }) => {
+      await page.goto('/recipes?time=quick&sort=oldest')
+
+      await searchFor(page, 'beef')
+
+      await expect(page).toHaveURL(listingUrl({ time: 'quick', sort: 'oldest', q: 'beef' }))
+      await expect(searchBox(page)).toHaveValue('beef')
+    })
   })
 })
 
@@ -353,6 +487,21 @@ test.describe('recipe list paging', () => {
     await expect(page).toHaveURL(listingUrl({ tag: 'paging', time: 'quick', sort: 'oldest', after: true }))
     await expect(recipeGridNames(page)).toHaveText(range(RECIPE_PAGE_SIZE + 1, PAGING_COUNT).map(pagingName))
     await expect(moreRecipes(page)).toHaveCount(0)
+  })
+
+  test('"More recipes" keeps the search, and a new search drops the cursor', async ({ page }) => {
+    await insertRecipes(pagingRecipes())
+
+    await page.goto('/recipes?q=e2e+paging')
+    await expect(recipeGridNames(page)).toHaveText(range(PAGING_COUNT, PAGING_COUNT - RECIPE_PAGE_SIZE + 1).map(pagingName))
+
+    await moreRecipes(page).click()
+    await expect(page).toHaveURL(listingUrl({ q: 'e2e paging', after: true }))
+    await expect(recipeGridNames(page)).toHaveText(range(PAGING_COUNT - RECIPE_PAGE_SIZE, 1).map(pagingName))
+
+    await searchFor(page, 'paging')
+    await expect(page).toHaveURL(listingUrl({ q: 'paging' }))
+    await expect(recipeGridNames(page)).toHaveCount(RECIPE_PAGE_SIZE)
   })
 
   test('changing a filter or the sort drops the cursor', async ({ page }) => {

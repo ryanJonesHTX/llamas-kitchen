@@ -7,15 +7,15 @@ import { RECIPE_SORT_OPTIONS, TIME_FILTERS } from '../lib/constants'
 import type { ListingQuery } from '../lib/recipes/listing'
 import { listingHref } from '../lib/recipes/listingHref'
 
-// The filter and sort state the URL holds, minus the page cursor.
-type ListingState = Pick<ListingQuery, 'tags' | 'time' | 'sort'>
+// The search, filter and sort state the URL holds, minus the page cursor.
+type ListingState = Pick<ListingQuery, 'tags' | 'time' | 'sort' | 'q'>
 
 // Rows are 44px tall on phones; the label fills the row, so all of it is tappable.
 const optionClass = 'flex min-h-11 items-center gap-x-3 text-base text-text sm:min-h-0 sm:text-sm'
 const labelClass = 'flex min-w-0 flex-1 items-center self-stretch'
 const inputClass = 'h-4 w-4 shrink-0 border-border-strong text-primary focus:ring-focus'
 
-// Checked state comes from the URL; every change navigates, which drops the cursor.
+// Checked state comes from the URL; every change navigates, keeping the search and dropping the cursor.
 export default function RecipeFilters({ state, tagsInUse }: { state: ListingState; tagsInUse: string[] }) {
   const router = useRouter()
   const go = (next: ListingState) => router.push(listingHref(next), { scroll: false })
