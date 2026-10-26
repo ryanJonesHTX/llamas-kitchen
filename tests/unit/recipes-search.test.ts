@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import mongoose, { Types } from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import { MAX_SEARCH_QUERY_LENGTH, MAX_SEARCH_WORDS } from '../../lib/constants'
-import { searchFilter, searchWords } from '../../lib/recipes/search'
+import { searchFilter, searchQueryParam } from '../../lib/recipes/search'
+import { searchWords } from '../../lib/recipes/searchWords'
 import { day, pendingDoc, recipeDoc, rejectedDoc } from '../fixtures/recipes'
 
 // Recipe search: the tokenizer, the word-prefix filter as MongoDB runs it
@@ -109,6 +110,38 @@ describe('searchFilter', () => {
 
   it.each([['a.b'], ['('], ['*'], ['two words'], ['']])('throws on %j, which is not a search word', (word) => {
     expect(() => searchFilter([word])).toThrow()
+  })
+})
+
+// The q parser /recipes and /api/search share.
+describe('searchQueryParam', () => {
+  const parseQ = (value: unknown) => searchQueryParam.safeParse(value)
+
+  it('reads a missing, empty or blank q as no search', () => {
+    for (const value of [undefined, '', '   ']) expect(parseQ(value)).toMatchObject({ success: true, data: undefined })
+  })
+
+  it('trims the text', () => {
+    expect(parseQ('  Chic thi ')).toMatchObject({ success: true, data: 'Chic thi' })
+  })
+
+  it('keeps punctuation-only text, a search that matches nothing', () => {
+    expect(parseQ('!!!')).toMatchObject({ success: true, data: '!!!' })
+  })
+
+  it(`accepts ${MAX_SEARCH_QUERY_LENGTH} characters after trimming and ${MAX_SEARCH_WORDS} distinct words`, () => {
+    const words = Array.from({ length: MAX_SEARCH_WORDS }, (_, i) => `w${i}`)
+    expect(parseQ(` ${'a'.repeat(MAX_SEARCH_QUERY_LENGTH)} `).success).toBe(true)
+    expect(parseQ([...words, ...words].join(' ')).success).toBe(true)
+  })
+
+  it.each<[string, unknown]>([
+    [`more than ${MAX_SEARCH_QUERY_LENGTH} characters`, 'a'.repeat(MAX_SEARCH_QUERY_LENGTH + 1)],
+    [`more than ${MAX_SEARCH_WORDS} distinct words`, Array.from({ length: MAX_SEARCH_WORDS + 1 }, (_, i) => `w${i}`).join(' ')],
+    ['an array (a repeated q)', ['chicken', 'rice']],
+    ['an array of one', ['chicken']],
+  ])('rejects %s', (_label, value) => {
+    expect(parseQ(value).success).toBe(false)
   })
 })
 

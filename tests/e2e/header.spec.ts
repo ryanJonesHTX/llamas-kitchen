@@ -43,10 +43,8 @@ const visibleButton = (page: Page, name: string) =>
 // The desktop user menu's button, named by the signed-in email.
 const userMenuButton = (page: Page, email: string) => visibleButton(page, email)
 
-// On desktop only the header's inline search renders; the mobile menu's copy
-// lives in a closed dialog.
-const search = (page: Page) =>
-  page.getByRole('combobox', { name: 'Search Recipes' })
+// The header's search trigger: a field-like button on desktop, an icon on phones.
+const searchTrigger = (page: Page) => visibleButton(page, 'Search recipes')
 
 const expectRecipePage = async (page: Page, target: SeedRecipe) => {
   await expect(page).toHaveURL(`/recipes/${target.slug}`)
@@ -102,29 +100,18 @@ for (const { path, sessions } of sitePages) {
       })
     }
 
-    test('choosing a search option with the keyboard opens that recipe', async ({
+    // The search dialog itself is covered in search-dialog.spec.ts.
+    test('the search trigger opens the search dialog, and a result opens that recipe', async ({
       context,
       page,
     }) => {
-      const curry = seedRecipe('E2E Chicken Curry')
-      await startAs(context, session)
-      await page.goto(path)
-
-      await search(page).fill('curry')
-      await expect(page.getByRole('option', { name: curry.name })).toBeVisible()
-      await search(page).press('ArrowDown')
-      await search(page).press('Enter')
-
-      await expectRecipePage(page, curry)
-    })
-
-    test('clicking a search option opens that recipe', async ({ context, page }) => {
       const tacos = seedRecipe('E2E Chicken Tacos')
       await startAs(context, session)
       await page.goto(path)
 
-      await search(page).fill('tacos')
-      await page.getByRole('option', { name: tacos.name }).click()
+      await searchTrigger(page).click()
+      await page.getByRole('combobox', { name: 'Search recipes' }).fill('tacos')
+      await page.getByRole('option', { name: new RegExp(`^${tacos.name}`) }).click()
 
       await expectRecipePage(page, tacos)
     })
@@ -234,21 +221,6 @@ test('on an edit page neither Home nor Recipes is the current page', async ({ co
   await expect(globalNavLink(page, 'Recipes')).not.toHaveAttribute('aria-current')
 })
 
-// The pending "E2E Pending Beef Pie" matches too, but is never an option.
-test('typing part of a recipe name shows matching search options and hides the rest', async ({
-  page,
-}) => {
-  await page.goto('/recipes')
-
-  await search(page).fill('beef')
-
-  await expect(page.getByRole('option')).toHaveCount(2)
-  await expect(page.getByRole('option', { name: 'E2E Beef Stew' })).toBeVisible()
-  await expect(page.getByRole('option', { name: 'E2E Beef Burgers' })).toBeVisible()
-  await expect(page.getByRole('option', { name: 'E2E Chicken Tacos' })).toHaveCount(0)
-  await expect(page.getByRole('option', { name: 'E2E Pork Chops' })).toHaveCount(0)
-})
-
 // Only admins get the Review link to the moderation queue.
 for (const session of ['signed out', 'user', 'admin'] as const) {
   const shown = session === 'admin'
@@ -285,10 +257,10 @@ test('at 1024px wide the header fits for an admin with a long email', async ({ c
   )
   // Review is the last nav link.
   const review = (await globalNavLink(page, 'Review').boundingBox())!
-  const searchBox = (await search(page).boundingBox())!
+  const search = (await searchTrigger(page).boundingBox())!
   const userMenu = (await userMenuButton(page, 'a-rather-long-admin-name@example.com').boundingBox())!
 
-  expect(review.x + review.width).toBeLessThan(searchBox.x)
+  expect(review.x + review.width).toBeLessThan(search.x)
   expect(userMenu.x + userMenu.width).toBeLessThanOrEqual(contentRight)
 })
 

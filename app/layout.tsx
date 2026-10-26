@@ -6,7 +6,6 @@ import { SessionProvider } from 'next-auth/react'
 import { auth } from '../auth'
 import SiteHeader from '../components/SiteHeader'
 import Toaster from '../components/Toaster'
-import { publishedSearchOptions } from '../lib/recipes/queries'
 import { parseTheme, THEME_COOKIE } from '../lib/theme'
 import '../styles/globals.css'
 
@@ -28,7 +27,6 @@ export const metadata: Metadata = {
 // tabIndex -1 lets the link move focus there.
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const session = await auth()
-  const searchOptions = await publishedSearchOptions()
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value)
   return (
     <html
@@ -44,7 +42,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           Skip to content
         </a>
         <SessionProvider session={session}>
-          <SiteHeader searchOptions={searchOptions} theme={theme} />
+          <SiteHeader theme={theme} />
           <main id="main" tabIndex={-1} className="focus:outline-none">
             {children}
           </main>

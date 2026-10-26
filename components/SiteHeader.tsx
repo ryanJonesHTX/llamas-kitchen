@@ -3,15 +3,14 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Dialog, DialogPanel } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
 import AuthControl from './AuthControl'
-import RecipeSearch from './RecipeSearch'
+import SearchDialog, { SearchTrigger, useSearchShortcut } from './SearchDialog'
 import ThemeToggle from './ThemeToggle'
 import { NAV_LINKS } from '../lib/constants'
-import type { RecipeSearchOption } from '../lib/recipes/queries'
 import { isAdmin } from '../lib/roles'
 import type { Theme } from '../lib/theme'
 
@@ -41,14 +40,15 @@ function Brand({ onClick }: { onClick?: () => void }) {
   )
 }
 
-export default function SiteHeader({
-  searchOptions,
-  theme,
-}: {
-  searchOptions: RecipeSearchOption[]
-  theme: Theme
-}) {
+export default function SiteHeader({ theme }: { theme: Theme }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  // The shortcut works with the mobile menu open; it closes, so only one dialog is ever open.
+  const openSearch = useCallback(() => {
+    setMobileMenuOpen(false)
+    setSearchOpen(true)
+  }, [])
+  useSearchShortcut(openSearch)
   const [currentTheme, setCurrentTheme] = useState(theme)
   const pathname = usePathname()
   // Hidden while the session loads, so signed-out visitors never see them.
@@ -84,20 +84,21 @@ export default function SiteHeader({
           ))}
         </div>
         <div className="ml-auto hidden items-center gap-x-3 lg:flex xl:gap-x-6">
-          <div className="w-40 xl:w-64">
-            <RecipeSearch options={searchOptions} />
-          </div>
+          <SearchTrigger onClick={openSearch} />
           <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />
           <AuthControl />
         </div>
-        <button
-          type="button"
-          className="-mr-2 ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-text lg:hidden"
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <span className="sr-only">Open main menu</span>
-          <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-        </button>
+        <div className="-mr-2 ml-auto flex items-center lg:hidden">
+          <SearchTrigger compact onClick={openSearch} />
+          <button
+            type="button"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-text"
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <span className="sr-only">Open main menu</span>
+            <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+          </button>
+        </div>
       </nav>
       <Dialog
         as="div"
@@ -141,12 +142,10 @@ export default function SiteHeader({
               <span className="text-base text-muted">Theme</span>
               <ThemeToggle theme={currentTheme} onChange={setCurrentTheme} />
             </div>
-            <div className="pt-2">
-              <RecipeSearch options={searchOptions} />
-            </div>
           </div>
         </DialogPanel>
       </Dialog>
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   )
 }

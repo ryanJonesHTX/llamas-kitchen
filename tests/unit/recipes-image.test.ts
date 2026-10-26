@@ -3,7 +3,7 @@ import { recipeImageUrl, recipeImageUrlPrefix, type RecipeImageSize } from '../.
 
 // One helper builds every recipe image URL from the Cloudinary public ID.
 
-const sizes: RecipeImageSize[] = ['card', 'hero', 'og']
+const sizes: RecipeImageSize[] = ['thumb', 'card', 'hero', 'og']
 
 beforeEach(() => {
   vi.stubEnv('CLOUDINARY_CLOUD_NAME', 'demo')
@@ -31,6 +31,11 @@ describe('recipeImageUrl', () => {
     expect(url).toContain('c_fill')
     expect(url).toContain('w_1200')
     expect(url).toContain('h_630')
+  })
+
+  it('crops the thumb size to 96x96 around the subject', () => {
+    const url = recipeImageUrl('recipes/beef-stew', 'thumb')
+    expect(url).toContain('c_fill,g_auto,w_96,h_96')
   })
 
   it('gives each size a different URL', () => {

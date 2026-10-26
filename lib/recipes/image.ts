@@ -1,8 +1,9 @@
 // Server-only: reads CLOUDINARY_CLOUD_NAME. Client components get the URLs (or a prefix) as props.
 
-export type RecipeImageSize = 'card' | 'hero' | 'og'
+export type RecipeImageSize = 'thumb' | 'card' | 'hero' | 'og'
 
 const TRANSFORMATIONS: Record<RecipeImageSize, string> = {
+  thumb: 'c_fill,g_auto,w_96,h_96',
   card: 'c_fill,g_auto,w_800,h_600',
   hero: 'c_limit,w_1400',
   og: 'c_fill,w_1200,h_630',

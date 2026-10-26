@@ -110,19 +110,6 @@ describe('latestPublished', () => {
   })
 })
 
-describe('publishedSearchOptions', () => {
-  it('returns only a name and a /recipes/<slug> href for each published recipe', async () => {
-    const options = await queries.publishedSearchOptions()
-    const byName = [...options].sort((a, b) => a.name.localeCompare(b.name))
-    expect(byName).toEqual([
-      { name: 'Apple Pie', href: '/recipes/apple-pie' },
-      { name: 'Beef Stew', href: '/recipes/beef-stew' },
-      { name: 'Carrot Soup', href: '/recipes/carrot-soup' },
-      { name: 'Date Bars', href: '/recipes/date-bars' },
-    ])
-  })
-})
-
 describe('publishedTagsInUse', () => {
   it('returns each tag used by a published recipe once, sorted', async () => {
     expect(await queries.publishedTagsInUse()).toEqual(['baking', 'dessert', 'main dish', 'soup'])
@@ -137,11 +124,6 @@ describe.each(hidden)('public queries hide a $status recipe', ({ id: hiddenId, n
   it('latestPublished leaves it out', async () => {
     const recipes = await queries.latestPublished(10)
     expect(recipes.map((r) => r.name)).not.toContain(name)
-  })
-
-  it('publishedSearchOptions leaves it out', async () => {
-    const options = await queries.publishedSearchOptions()
-    expect(options.map((o) => o.name)).not.toContain(name)
   })
 
   it('publishedTagsInUse leaves out its tags', async () => {

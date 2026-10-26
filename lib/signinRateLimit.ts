@@ -1,5 +1,6 @@
 // In-memory limits for magic-link sign-in emails; createRateLimiter also
-// limits image uploads (app/recipes/actions.ts). Production runs a single
+// limits image uploads (app/recipes/actions.ts) and, with clientIp, searches
+// (app/api/search/route.ts). Production runs a single
 // `next start` process, so per-process state is the whole picture.
 const WINDOW_MS = 15 * 60 * 1000
 const EMAIL_LIMIT = 5
@@ -45,7 +46,7 @@ export function createRateLimiter({
 
 // Nginx's proxy_add_x_forwarded_for appends the real client, so earlier
 // entries can be spoofed; only the last one is trustworthy.
-function clientIp(request: Request): string {
+export function clientIp(request: Request): string {
   const xff = request.headers.get('x-forwarded-for')
   if (xff === null) return 'direct'
   return xff.split(',').at(-1)!.trim()

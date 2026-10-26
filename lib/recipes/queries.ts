@@ -2,10 +2,12 @@ import { isObjectIdOrHexString, type Types } from 'mongoose'
 import dbConnect from '../dbConnect'
 import { CARD_FIELDS, type RecipeCardRecord } from './listing'
 import { Recipe, type RecipeRecord } from './model'
+import { nameSearchFilter, searchFilter } from './search'
 
 export type { RecipeRecord }
 
-export type RecipeSearchOption = { name: string; href: string }
+// A recipe as the search dialog lists it, before its image becomes a URL.
+export type SearchHit = Pick<RecipeRecord, 'name' | 'slug' | 'tags' | 'imagePublicId'>
 
 // A pending recipe as the review queue lists it. submitter is the user's name
 // or email, or null when their account is gone. updatedAt goes back with a
@@ -43,12 +45,23 @@ export async function latestPublished(n: number): Promise<RecipeCardRecord[]> {
   return Recipe.find(PUBLISHED, CARD_FIELDS).sort(NEWEST_FIRST).limit(n).lean<RecipeCardRecord[]>()
 }
 
-export async function publishedSearchOptions(): Promise<RecipeSearchOption[]> {
+// The top published matches for searchWords' words: those with every word in
+// the name first, then the rest, each group newest first. The groups don't
+// overlap, so they are fetched in parallel.
+export async function searchPublished(words: string[], limit: number): Promise<SearchHit[]> {
+  // Mongo reads a limit of 0 as no limit.
+  if (!Number.isInteger(limit) || limit < 1) throw new Error(`searchPublished: limit must be a positive integer, got ${limit}`)
+  const inName = nameSearchFilter(words)
+  const fields = { _id: 0, name: 1, slug: 1, tags: 1, imagePublicId: 1 }
   await dbConnect()
-  const recipes = await Recipe.find(PUBLISHED, { _id: 0, name: 1, slug: 1 }).lean<
-    Pick<RecipeRecord, 'name' | 'slug'>[]
-  >()
-  return recipes.map(({ name, slug }) => ({ name, href: `/recipes/${slug}` }))
+  const [nameHits, otherHits] = await Promise.all([
+    Recipe.find({ ...PUBLISHED, ...inName }, fields).sort(NEWEST_FIRST).limit(limit).lean<SearchHit[]>(),
+    Recipe.find({ ...PUBLISHED, $and: [searchFilter(words), { $nor: [inName] }] }, fields)
+      .sort(NEWEST_FIRST)
+      .limit(limit)
+      .lean<SearchHit[]>(),
+  ])
+  return [...nameHits, ...otherHits].slice(0, limit)
 }
 
 export async function publishedTagsInUse(): Promise<string[]> {

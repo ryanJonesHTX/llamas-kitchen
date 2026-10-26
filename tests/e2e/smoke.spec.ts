@@ -29,7 +29,6 @@ const newestFirst = [
   'E2E Beef Stew',
 ]
 
-const search = (page: Page) => page.getByRole('combobox', { name: 'Search Recipes' })
 
 // Recipe links go to /recipes/<slug>.
 async function expectSlugLinks(page: Page, names: string[]) {
@@ -93,17 +92,19 @@ test.describe('home page', () => {
 })
 
 for (const path of ['/', '/recipes', `/recipes/${publishedRecipes[0].slug}`]) {
-  test(`${path} shows no pending or rejected recipe, not even in the search options`, async ({ page }) => {
+  test(`${path} shows no pending or rejected recipe, not even in the search dialog`, async ({ page }) => {
     await page.goto(path)
     for (const hidden of hiddenRecipes) {
       await expect(page.getByText(hidden.name)).toHaveCount(0)
     }
 
-    await search(page).fill('E2E')
+    await page.getByRole('button', { name: 'Search recipes', exact: true }).filter({ visible: true }).click()
+    await page.getByRole('combobox', { name: 'Search recipes' }).fill('E2E')
 
-    await expect(page.getByRole('option')).toHaveCount(publishedRecipes.length)
+    // Every published recipe, then "See all results".
+    await expect(page.getByRole('option')).toHaveCount(publishedRecipes.length + 1)
     for (const hidden of hiddenRecipes) {
-      await expect(page.getByRole('option', { name: hidden.name })).toHaveCount(0)
+      await expect(page.getByRole('option', { name: new RegExp(`^${hidden.name}`) })).toHaveCount(0)
     }
   })
 }

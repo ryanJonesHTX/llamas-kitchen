@@ -46,3 +46,8 @@ export const UPLOAD_RATE_WINDOW_MS = 60 * 60 * 1000
 // Recipe search: the longest query in characters, and the most distinct words.
 export const MAX_SEARCH_QUERY_LENGTH = 100
 export const MAX_SEARCH_WORDS = 6
+
+// /api/search requests per client IP per window, and the most results it returns.
+export const SEARCH_RATE_LIMIT = 60
+export const SEARCH_RATE_WINDOW_MS = 60 * 1000
+export const SEARCH_RESULT_LIMIT = 8

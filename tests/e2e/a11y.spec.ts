@@ -183,6 +183,15 @@ const scenarios: Scenario[] = [
     },
   },
   {
+    name: 'open search dialog with results',
+    open: async (page) => {
+      await page.goto('/')
+      await page.getByRole('button', { name: 'Search recipes', exact: true }).filter({ visible: true }).click()
+      await page.getByRole('combobox', { name: 'Search recipes' }).fill('chic')
+      await expect(page.getByRole('option', { name: 'See all results for “chic”' })).toBeVisible()
+    },
+  },
+  {
     name: 'not-found page',
     open: async (page) => {
       await page.goto('/a/b/c')
