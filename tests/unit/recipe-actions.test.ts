@@ -368,6 +368,28 @@ describe('the pending cap', () => {
   })
 })
 
+// The cap check and the insert must not interleave between requests.
+describe('the pending cap under concurrent submissions', () => {
+  it('lets exactly one of several concurrent submissions take the last slot', async () => {
+    auth.mockResolvedValue(userSession)
+    for (let n = 1; n < MAX_PENDING_PER_USER; n++) {
+      await seed(pendingDoc({ slug: `pending-${n}`, submittedBy: userId }))
+    }
+    const names = ['Lamb Stew', 'Fish Pie', 'Pea Soup', 'Corn Bread', 'Apple Tart', 'Plum Jam']
+
+    const results = await Promise.all(names.map((name) => actions.createRecipe(validInput({ name }))))
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual(
+      Array(names.length - 1).fill({
+        ok: false,
+        formError: "You have 5 recipes waiting for review. You can submit more once they've been reviewed.",
+      })
+    )
+    expect(await Recipe.countDocuments({ submittedBy: userId, status: 'pending' })).toBe(MAX_PENDING_PER_USER)
+  })
+})
+
 // ---------------------------------------------------------------- update
 
 describe('updateRecipe', () => {
@@ -639,16 +661,67 @@ describe('updateRecipe for a signed-in user who is not an admin', () => {
     }
   )
 
-  it('lets a user at the pending cap edit a pending recipe and resubmit a rejected one', async () => {
+  it('lets a user at the pending cap edit a pending recipe', async () => {
     for (let n = 1; n <= MAX_PENDING_PER_USER; n++) {
       await seed(pendingDoc({ slug: `pending-${n}`, submittedBy: userId }))
     }
     const pendingId = (await stored({ slug: 'pending-1' }))!._id
-    const rejectedId = await seed(rejectedDoc({ slug: 'rejected-1', submittedBy: userId }))
 
     expect(await actions.updateRecipe(pendingId.toHexString(), validInput())).toEqual({ ok: true, slug: 'pending-1' })
+  })
+})
+
+// Resubmitting a rejected recipe sends it back to review, so it counts
+// against the pending cap like a new submission.
+describe('the pending cap on resubmitting a rejected recipe', () => {
+  const CAP_ERROR = {
+    ok: false,
+    formError: "You have 5 recipes waiting for review. You can submit more once they've been reviewed.",
+  }
+
+  async function seedPending(count: number) {
+    for (let n = 1; n <= count; n++) await seed(pendingDoc({ slug: `pending-${n}`, submittedBy: userId }))
+  }
+
+  beforeEach(() => {
+    auth.mockResolvedValue(userSession)
+  })
+
+  it('refuses to resubmit when the user is at the cap, leaving the recipe rejected and unchanged', async () => {
+    await seedPending(MAX_PENDING_PER_USER)
+    const rejectedId = await seed(rejectedDoc({ slug: 'rejected-1', submittedBy: userId }))
+    const before = await allRecipes()
+
+    const result = await actions.updateRecipe(rejectedId.toHexString(), validInput({ description: 'Fixed it.' }))
+
+    expect(result).toEqual(CAP_ERROR)
+    expect(await stored({ _id: rejectedId })).toMatchObject({ status: 'rejected', rejectionReason: 'Not a recipe.' })
+    expect(await allRecipes()).toEqual(before)
+  })
+
+  it('resubmits to pending when the user has one slot left under the cap', async () => {
+    await seedPending(MAX_PENDING_PER_USER - 1)
+    const rejectedId = await seed(rejectedDoc({ slug: 'rejected-1', submittedBy: userId }))
+
     expect(await actions.updateRecipe(rejectedId.toHexString(), validInput())).toEqual({ ok: true, slug: 'rejected-1' })
     expect(await stored({ _id: rejectedId })).toMatchObject({ status: 'pending' })
+  })
+
+  it('lets only one of a concurrent create and two resubmissions take the last slot', async () => {
+    await seedPending(MAX_PENDING_PER_USER - 1)
+    const rejectedIds = [
+      await seed(rejectedDoc({ slug: 'rejected-1', submittedBy: userId })),
+      await seed(rejectedDoc({ slug: 'rejected-2', submittedBy: userId })),
+    ]
+
+    const results = await Promise.all([
+      ...rejectedIds.map((id) => actions.updateRecipe(id.toHexString(), validInput())),
+      actions.createRecipe(validInput({ name: 'Lamb Stew' })),
+    ])
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual([CAP_ERROR, CAP_ERROR])
+    expect(await Recipe.countDocuments({ submittedBy: userId, status: 'pending' })).toBe(MAX_PENDING_PER_USER)
   })
 })
 

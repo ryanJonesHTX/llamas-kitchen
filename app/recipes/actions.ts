@@ -9,6 +9,7 @@ import { requireAdminSession, requireUserSession } from '../../lib/guards'
 import dbConnect from '../../lib/dbConnect'
 import { requireEnv } from '../../lib/env'
 import { IMAGE_HEADER_BYTES, matchesImageType } from '../../lib/imageType'
+import { createKeyedLock } from '../../lib/keyedLock'
 import { recipeInputSchema } from '../../lib/recipes/input'
 import { Recipe, type RecipeRecord } from '../../lib/recipes/model'
 import { canEdit } from '../../lib/recipes/permissions'
@@ -46,7 +47,15 @@ const UPLOAD_TIMEOUT_MS = 30_000
 
 const SLUG_TAKEN: SaveResult = { ok: false, fieldErrors: { slug: ['another recipe already uses this slug'] } }
 
-const PENDING_CAP_MESSAGE = `You have ${MAX_PENDING_PER_USER} recipes waiting for review. You can submit more once they've been reviewed.`
+const PENDING_CAP: SaveResult = {
+  ok: false,
+  formError: `You have ${MAX_PENDING_PER_USER} recipes waiting for review. You can submit more once they've been reviewed.`,
+}
+
+// Serializes each non-admin's pending-cap check and write, so concurrent
+// submissions can't all pass the check. In-process: production is a single
+// `next start` process.
+const pendingCapLock = createKeyedLock()
 
 // The same answer for a missing recipe and one already reviewed.
 const NOT_PENDING: ReviewResult = { ok: false, formError: 'This recipe is no longer waiting for review.' }
@@ -75,13 +84,16 @@ function matchedNothing(error: unknown): boolean {
   return error instanceof mongooseError.DocumentNotFoundError || error instanceof mongooseError.VersionError
 }
 
-// Whether a non-admin already has as many recipes awaiting review as allowed.
-// Two submissions at once can both pass; the cap is a speed bump, not a lock.
-async function atPendingCap(session: Session): Promise<boolean> {
-  if (isAdmin(session)) return false
-  await dbConnect()
-  const pending = await Recipe.countDocuments({ submittedBy: new Types.ObjectId(session.user.id), status: 'pending' })
-  return pending >= MAX_PENDING_PER_USER
+// Runs a write that adds a pending recipe, unless the non-admin already has
+// as many awaiting review as allowed. The count and the write hold the user's
+// lock. Admins are exempt.
+async function withinPendingCap(session: Session, write: () => Promise<SaveResult>): Promise<SaveResult> {
+  if (isAdmin(session)) return write()
+  return pendingCapLock.withLock(session.user.id, async () => {
+    await dbConnect()
+    const pending = await Recipe.countDocuments({ submittedBy: new Types.ObjectId(session.user.id), status: 'pending' })
+    return pending >= MAX_PENDING_PER_USER ? PENDING_CAP : write()
+  })
 }
 
 // The unique slug index rejected a write: another recipe took the slug after it was checked.
@@ -92,33 +104,35 @@ function isDuplicateSlug(error: unknown): boolean {
 // An admin's recipe publishes at once; anyone else's is pending, with no publishedAt.
 export async function createRecipe(input: unknown): Promise<SaveResult> {
   const session = await requireUserSession()
-  if (await atPendingCap(session)) return { ok: false, formError: PENDING_CAP_MESSAGE }
-  const parsed = recipeInputSchema.safeParse(input)
-  if (!parsed.success) return fieldErrorsOf(parsed.error)
+  return withinPendingCap(session, async () => {
+    const parsed = recipeInputSchema.safeParse(input)
+    if (!parsed.success) return fieldErrorsOf(parsed.error)
 
-  await dbConnect()
-  const slug = await uniqueSlug(parsed.data.name)
-  const admin = isAdmin(session)
-  try {
-    await Recipe.create({
-      ...parsed.data,
-      slug,
-      submittedBy: new Types.ObjectId(session.user.id),
-      status: admin ? 'published' : 'pending',
-      publishedAt: admin ? new Date() : undefined,
-    })
-  } catch (error) {
-    if (isDuplicateSlug(error)) return SLUG_TAKEN
-    throw error
-  }
-  return { ok: true, slug }
+    await dbConnect()
+    const slug = await uniqueSlug(parsed.data.name)
+    const admin = isAdmin(session)
+    try {
+      await Recipe.create({
+        ...parsed.data,
+        slug,
+        submittedBy: new Types.ObjectId(session.user.id),
+        status: admin ? 'published' : 'pending',
+        publishedAt: admin ? new Date() : undefined,
+      })
+    } catch (error) {
+      if (isDuplicateSlug(error)) return SLUG_TAKEN
+      throw error
+    }
+    return { ok: true, slug }
+  })
 }
 
 // Replaces the input fields, and for an admin the slug; submittedBy,
 // publishedAt and createdAt are never touched. An owner saving their rejected
-// recipe sends it back to review; otherwise the status is kept. Edits never
-// meet the pending cap. Saved through doc.save() so the conditional
-// validators run against the whole document.
+// recipe sends it back to review, so it counts against the pending cap like a
+// new submission; otherwise the status is kept and the cap doesn't apply.
+// Saved through doc.save() so the conditional validators run against the
+// whole document.
 export async function updateRecipe(id: string, input: unknown): Promise<SaveResult> {
   const session = await requireUserSession()
   // The same answer for a missing recipe and one this user may not edit
@@ -145,19 +159,21 @@ export async function updateRecipe(id: string, input: unknown): Promise<SaveResu
   if (recipe.isModified('slug') && (await Recipe.exists({ slug: recipe.slug, _id: { $ne: recipe._id } }))) {
     return SLUG_TAKEN
   }
-  if (!admin && recipe.status === 'rejected') {
-    recipe.status = 'pending'
-    recipe.rejectionReason = undefined
+  const save = async (): Promise<SaveResult> => {
+    try {
+      await recipe.save()
+    } catch (error) {
+      if (isDuplicateSlug(error)) return SLUG_TAKEN
+      // The status changed since the load.
+      if (matchedNothing(error)) return cantEdit
+      throw error
+    }
+    return { ok: true, slug: recipe.slug }
   }
-  try {
-    await recipe.save()
-  } catch (error) {
-    if (isDuplicateSlug(error)) return SLUG_TAKEN
-    // The status changed since the load.
-    if (matchedNothing(error)) return cantEdit
-    throw error
-  }
-  return { ok: true, slug: recipe.slug }
+  if (admin || recipe.status !== 'rejected') return save()
+  recipe.status = 'pending'
+  recipe.rejectionReason = undefined
+  return withinPendingCap(session, save)
 }
 
 // The pending recipe with this id, as the admin saw it: `updatedAt` is the
