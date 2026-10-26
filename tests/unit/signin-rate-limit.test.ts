@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  clientIp,
   createRateLimiter,
   createResendSigninGuard,
 } from '../../lib/signinRateLimit'
@@ -58,6 +59,127 @@ describe('createRateLimiter', () => {
     t = 60_000
     limiter.hit('c')
     expect(limiter.size()).toBe(1)
+  })
+
+  it('sweeps expired keys at most once per window', () => {
+    let t = 0
+    const limiter = createRateLimiter({ limit: 5, windowMs: 60_000, now: () => t })
+
+    limiter.hit('a')
+    t = 30_000
+    limiter.hit('b')
+    t = 60_000
+    limiter.hit('c') // sweeps: 'a' has expired
+    expect(limiter.size()).toBe(2)
+
+    t = 90_000
+    limiter.hit('d') // 'b' has expired, but the last sweep was under a window ago
+    expect(limiter.size()).toBe(3)
+
+    t = 120_000
+    limiter.hit('e') // sweeps: 'b' and 'c' have expired; 'd' has not
+    expect(limiter.size()).toBe(2)
+  })
+
+  it('does not scan the keys on every hit', () => {
+    let t = 0
+    const limiter = createRateLimiter({ limit: 5, windowMs: 60_000, now: () => t })
+    for (let i = 0; i < 100; i++) limiter.hit(`key${i}`)
+
+    // The sweep is the only Map iteration in hit(). Counts are read before
+    // restoring, so expect's own iteration can't add to them.
+    const iterator = vi.spyOn(Map.prototype, Symbol.iterator)
+    let scansWithinWindow: number
+    let scansAfterWindow: number
+    try {
+      for (let i = 0; i < 100; i++) {
+        t = i * 100
+        limiter.hit(`other${i}`)
+      }
+      scansWithinWindow = iterator.mock.calls.length
+      t = 60_000
+      limiter.hit('later')
+      scansAfterWindow = iterator.mock.calls.length
+    } finally {
+      iterator.mockRestore()
+    }
+    expect(scansWithinWindow).toBe(0)
+    expect(scansAfterWindow).toBe(1)
+  })
+
+  it('starts a fresh window for an expired key that has not been swept yet', () => {
+    let t = 0
+    const limiter = createRateLimiter({ limit: 1, windowMs: 60_000, now: () => t })
+
+    t = 30_000
+    limiter.hit('a')
+    t = 60_000
+    limiter.hit('b') // sweeps; 'a' has 30s left
+    t = 90_000
+    expect(limiter.size()).toBe(2) // 'a' expired but is still stored
+    expect(limiter.hit('a')).toEqual({ allowed: true })
+    t = 100_000
+    expect(limiter.hit('a')).toEqual({ allowed: false, retryAfterSeconds: 50 })
+  })
+})
+
+function keyFor(xff: string | undefined): string {
+  const headers: Record<string, string> = xff === undefined ? {} : { 'x-forwarded-for': xff }
+  return clientIp(new Request('http://localhost:3000/api/search', { headers }))
+}
+
+describe('clientIp', () => {
+  it("returns 'direct' without an X-Forwarded-For header", () => {
+    expect(keyFor(undefined)).toBe('direct')
+  })
+
+  it('returns the last X-Forwarded-For entry', () => {
+    expect(keyFor('198.51.100.1, 203.0.113.7')).toBe('203.0.113.7')
+    expect(keyFor(' 203.0.113.7 ')).toBe('203.0.113.7')
+  })
+
+  it('returns an IPv4-mapped IPv6 address as the IPv4 address', () => {
+    expect(keyFor('::ffff:203.0.113.7')).toBe('203.0.113.7')
+    expect(keyFor('::FFFF:203.0.113.7')).toBe('203.0.113.7')
+    expect(keyFor('0:0:0:0:0:ffff:cb00:7107')).toBe('203.0.113.7')
+  })
+
+  it('keys an IPv6 address by its /64 prefix', () => {
+    expect(keyFor('2001:db8:1:2:3:4:5:6')).toBe('2001:db8:1:2::/64')
+    expect(keyFor('::1')).toBe('0:0:0:0::/64')
+    expect(keyFor('::')).toBe('0:0:0:0::/64')
+    expect(keyFor('64:ff9b::203.0.113.7')).toBe('64:ff9b:0:0::/64')
+  })
+
+  it('gives every spelling of the same /64 the same key', () => {
+    const spellings = [
+      '2001:db8:0:a::1',
+      '2001:0db8:0000:000a:0000:0000:0000:0001',
+      '2001:DB8:0:A::1',
+      '2001:db8::a:0:0:0:1',
+      '2001:db8:0:a:ffff:ffff:ffff:ffff',
+      '2001:db8:0:a::99%eth0',
+      '2001:db8:0:a::1.2.3.4',
+    ]
+    for (const xff of spellings) expect(keyFor(`198.51.100.1, ${xff}`)).toBe('2001:db8:0:a::/64')
+  })
+
+  it('drops a zone id', () => {
+    expect(keyFor('fe80::1%eth0')).toBe('fe80:0:0:0::/64')
+    expect(keyFor('FE80::abcd%25')).toBe('fe80:0:0:0::/64')
+  })
+
+  it('uses an entry that is not an IP address as-is', () => {
+    expect(keyFor('unknown')).toBe('unknown')
+    expect(keyFor('1.2.3.4, 01.2.3.4')).toBe('01.2.3.4')
+  })
+
+  it('puts two addresses in one /64 in one bucket and different /64s in different ones', () => {
+    const limiter = createRateLimiter({ limit: 1, windowMs: 60_000, now: () => 0 })
+
+    expect(limiter.hit(keyFor('2001:db8:0:a::1'))).toEqual({ allowed: true })
+    expect(limiter.hit(keyFor('2001:db8:0:a:dead:beef:0:2')).allowed).toBe(false)
+    expect(limiter.hit(keyFor('2001:db8:0:b::1'))).toEqual({ allowed: true })
   })
 })
 

@@ -9,8 +9,8 @@ import { Recipe } from '../../lib/recipes/model'
 import { recipeDoc } from '../fixtures/recipes'
 
 // scripts/sync-indexes.ts syncs the Recipe indexes with the model (autoIndex
-// is off) against an explicit MONGODB_URI. Runs it as a child process, the way it
-// is run by hand, against an in-memory MongoDB.
+// is off) against an explicit MONGODB_URI; a dry run unless --apply. Runs it as
+// a child process, the way it is run by hand, against an in-memory MongoDB.
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 const run = promisify(execFile)
@@ -53,8 +53,17 @@ const declared = [
   { key: { submittedBy: 1, createdAt: -1 } },
 ]
 
-const syncIndexes = (dbName: string) =>
-  run(process.execPath, [script], { cwd: repoRoot, env: childEnv({ MONGODB_URI: mongo.getUri(dbName) }) })
+const syncIndexes = (dbName: string, args: string[] = []) =>
+  run(process.execPath, [script, ...args], { cwd: repoRoot, env: childEnv({ MONGODB_URI: mongo.getUri(dbName) }) })
+
+const OLD_TEXT_INDEX = { _fts: 'text', _ftsx: 1 }
+
+async function createOldTextIndex(dbName: string) {
+  await client.db(dbName).collection('recipes').createIndex(
+    { name: 'text', 'ingredients.item': 'text', tags: 'text' },
+    { name: 'old_text', weights: { name: 10, 'ingredients.item': 5, tags: 3 } }
+  )
+}
 
 describe('sync-indexes', () => {
   it('creates no indexes just by using the model', async () => {
@@ -67,24 +76,56 @@ describe('sync-indexes', () => {
     expect(await recipeIndexes(dbName)).toEqual([{ key: { _id: 1 } }])
   })
 
-  it('creates every index the model declares', async () => {
-    const dbName = 'sync-indexes-run'
+  it('prints the target hosts, database and mode before anything else', async () => {
+    const dbName = 'sync-indexes-target'
+    const host = new URL(mongo.getUri()).host
+
+    const dryRun = await syncIndexes(dbName)
+    expect(dryRun.stdout.split('\n').slice(0, 2)).toEqual([
+      `Target: ${host}, database ${dbName}`,
+      'Mode: dry run (pass --apply to write)',
+    ])
+
+    const apply = await syncIndexes(dbName, ['--apply'])
+    expect(apply.stdout.split('\n').slice(0, 2)).toEqual([`Target: ${host}, database ${dbName}`, 'Mode: apply'])
+  })
+
+  it('in a dry run reports the old text index and the missing indexes, and changes nothing', async () => {
+    const dbName = 'sync-indexes-dry-run'
+    await createOldTextIndex(dbName)
+    const before = await recipeIndexes(dbName)
+
     const { stdout } = await syncIndexes(dbName)
+
+    expect(await recipeIndexes(dbName)).toEqual(before)
+    expect(await recipeIndexes(dbName)).toContainEqual(expect.objectContaining({ key: OLD_TEXT_INDEX }))
+    expect(stdout).toContain('Would drop: old_text')
+    expect(stdout).toContain('Would create: {"slug":1}')
+    expect(stdout).toContain('Dry run: nothing was written.')
+  })
+
+  it('in a dry run against an empty database creates nothing, not even the collection', async () => {
+    const dbName = 'sync-indexes-dry-run-empty'
+    await syncIndexes(dbName)
+
+    expect(await client.db(dbName).listCollections().toArray()).toEqual([])
+  })
+
+  it('with --apply creates every index the model declares', async () => {
+    const dbName = 'sync-indexes-run'
+    const { stdout } = await syncIndexes(dbName, ['--apply'])
 
     expect(await recipeIndexes(dbName)).toEqual(expect.arrayContaining(declared))
     expect(await recipeIndexes(dbName)).toHaveLength(declared.length)
     expect(stdout).toContain('Dropped none.')
   })
 
-  it('drops an index the model no longer declares, such as the old text index', async () => {
+  it('with --apply drops an index the model no longer declares, such as the old text index', async () => {
     const dbName = 'sync-indexes-drop'
-    await client.db(dbName).collection('recipes').createIndex(
-      { name: 'text', 'ingredients.item': 'text', tags: 'text' },
-      { name: 'old_text', weights: { name: 10, 'ingredients.item': 5, tags: 3 } }
-    )
-    expect(await recipeIndexes(dbName)).toContainEqual(expect.objectContaining({ key: { _fts: 'text', _ftsx: 1 } }))
+    await createOldTextIndex(dbName)
+    expect(await recipeIndexes(dbName)).toContainEqual(expect.objectContaining({ key: OLD_TEXT_INDEX }))
 
-    const { stdout } = await syncIndexes(dbName)
+    const { stdout } = await syncIndexes(dbName, ['--apply'])
 
     expect(await recipeIndexes(dbName)).toEqual(expect.arrayContaining(declared))
     expect(await recipeIndexes(dbName)).toHaveLength(declared.length)
@@ -93,11 +134,17 @@ describe('sync-indexes', () => {
 
   it('is idempotent', async () => {
     const dbName = 'sync-indexes-twice'
-    await syncIndexes(dbName)
-    const { stdout } = await syncIndexes(dbName)
+    await createOldTextIndex(dbName)
+    await syncIndexes(dbName, ['--apply'])
+    const { stdout } = await syncIndexes(dbName, ['--apply'])
 
+    expect(await recipeIndexes(dbName)).toEqual(expect.arrayContaining(declared))
     expect(await recipeIndexes(dbName)).toHaveLength(declared.length)
     expect(stdout).toContain('Dropped none.')
+
+    const dryRun = await syncIndexes(dbName)
+    expect(dryRun.stdout).toContain('Would drop: none')
+    expect(dryRun.stdout).toContain('Would create: none')
   })
 
   it('fails without MONGODB_URI', async () => {

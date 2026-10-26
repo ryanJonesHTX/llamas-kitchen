@@ -3,6 +3,7 @@
 // Reads only MONGODB_URI from the environment; no .env file is loaded.
 import { parseArgs } from 'node:util'
 import { MongoClient } from 'mongodb'
+import { hostsOf } from '../hostsOf.ts'
 import { migrate } from './migrate.ts'
 
 const uri = process.env.MONGODB_URI
@@ -13,12 +14,6 @@ const { values } = parseArgs({
 })
 const adminUserId = values['admin-user-id']
 if (!adminUserId) throw new Error('--admin-user-id <id> is required')
-
-// The host list between "scheme://[credentials@]" and the path; never the credentials or query.
-function hostsOf(connectionString: string): string {
-  const authority = connectionString.replace(/^mongodb(\+srv)?:\/\//, '').split(/[/?]/)[0]
-  return authority.slice(authority.lastIndexOf('@') + 1)
-}
 
 const client = new MongoClient(uri)
 try {
