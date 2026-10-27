@@ -1,29 +1,37 @@
 export type Ingredient = { quantity: number | null; unit: string | null; item: string }
 
+// Word units as [singular, plural]; scaling picks the form that fits the amount.
+export const UNIT_FORMS: [string, string][] = [
+  ['cup', 'cups'],
+  ['tablespoon', 'tablespoons'],
+  ['teaspoon', 'teaspoons'],
+  ['ounce', 'ounces'],
+  ['pound', 'pounds'],
+  ['gram', 'grams'],
+  ['kilogram', 'kilograms'],
+  ['milliliter', 'milliliters'],
+  ['millilitre', 'millilitres'],
+  ['liter', 'liters'],
+  ['litre', 'litres'],
+  ['quart', 'quarts'],
+  ['pint', 'pints'],
+  ['gallon', 'gallons'],
+  ['pinch', 'pinches'],
+  ['dash', 'dashes'],
+  ['clove', 'cloves'],
+  ['can', 'cans'],
+  ['package', 'packages'],
+  ['stick', 'sticks'],
+  ['slice', 'slices'],
+  ['sprig', 'sprigs'],
+  ['bunch', 'bunches'],
+  ['head', 'heads'],
+]
+
 // Single-word units, matched case-insensitively on the whole token.
 const UNITS = new Set([
-  'cup', 'cups', 'c',
-  'tablespoon', 'tablespoons', 'tbsp', 'tbs',
-  'teaspoon', 'teaspoons', 'tsp', 't',
-  'ounce', 'ounces', 'oz',
-  'pound', 'pounds', 'lb', 'lbs',
-  'gram', 'grams', 'g',
-  'kilogram', 'kilograms', 'kg',
-  'milliliter', 'milliliters', 'millilitre', 'millilitres', 'ml',
-  'liter', 'liters', 'litre', 'litres', 'l',
-  'quart', 'quarts', 'qt',
-  'pint', 'pints', 'pt',
-  'gallon', 'gallons', 'gal',
-  'pinch', 'pinches',
-  'dash', 'dashes',
-  'clove', 'cloves',
-  'can', 'cans',
-  'package', 'packages', 'pkg',
-  'stick', 'sticks',
-  'slice', 'slices',
-  'sprig', 'sprigs',
-  'bunch', 'bunches',
-  'head', 'heads',
+  ...UNIT_FORMS.flat(),
+  'c', 'tbsp', 'tbs', 'tsp', 't', 'oz', 'lb', 'lbs', 'g', 'kg', 'ml', 'l', 'qt', 'pt', 'gal', 'pkg',
 ])
 
 const VULGAR_FRACTIONS: Record<string, number> = {
