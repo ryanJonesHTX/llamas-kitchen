@@ -1,4 +1,4 @@
-import { MAX_INGREDIENT_ITEM_LENGTH } from '../../lib/constants.ts'
+import { MAX_INGREDIENT_ITEM_LENGTH, MAX_INGREDIENT_QUANTITY } from '../../lib/constants.ts'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { deleteSessions, disconnect, findRecipe, insertRecipes, reseed } from './db.ts'
@@ -182,6 +182,20 @@ test('an over-long ingredient shows its error on the ingredient inputs, focuses 
     new RegExp(`each ingredient item must be at most ${MAX_INGREDIENT_ITEM_LENGTH} characters`)
   )
   await expect(ingredientLine(page, 1)).toBeFocused()
+  await expect(page).toHaveURL(`/recipes/${stew.slug}/edit`)
+  expect(await findRecipe({ _id: stew._id })).toEqual(before)
+})
+
+test('a too-large ingredient quantity shows its error on the ingredient inputs and saves nothing', async ({ page }) => {
+  await page.goto(`/recipes/${stew.slug}/edit`)
+  const before = await findRecipe({ _id: stew._id })
+
+  await ingredientLine(page, 2).fill(`${MAX_INGREDIENT_QUANTITY * 2} cups flour`)
+  await saveButton(page).click()
+
+  await expect(ingredientLine(page, 1)).toHaveAccessibleDescription(
+    new RegExp(`each ingredient quantity must be at most ${MAX_INGREDIENT_QUANTITY}`)
+  )
   await expect(page).toHaveURL(`/recipes/${stew.slug}/edit`)
   expect(await findRecipe({ _id: stew._id })).toEqual(before)
 })

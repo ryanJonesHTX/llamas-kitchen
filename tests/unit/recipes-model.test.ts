@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import { Recipe } from '../../lib/recipes/model'
 import {
   MAX_INGREDIENT_ITEM_LENGTH,
+  MAX_INGREDIENT_QUANTITY,
   MAX_INGREDIENT_UNIT_LENGTH,
   MAX_RECIPE_CREDIT_LENGTH,
   MAX_RECIPE_DESCRIPTION_LENGTH,
@@ -217,6 +218,12 @@ describe('new Recipe model', () => {
     ['credit length', MAX_RECIPE_CREDIT_LENGTH, 'credit', (n) => ({ credit: 'x'.repeat(n) })],
     ['step length', MAX_RECIPE_STEP_LENGTH, 'steps', (n) => ({ steps: ['x'.repeat(n)] })],
     ['step count', MAX_RECIPE_STEPS, 'steps', (n) => ({ steps: Array.from({ length: n }, () => 'Mix.') })],
+    [
+      'ingredient quantity',
+      MAX_INGREDIENT_QUANTITY,
+      'ingredients',
+      (n) => ({ ingredients: [{ quantity: n, unit: 'cups', item: 'flour' }] }),
+    ],
     [
       'ingredient item length',
       MAX_INGREDIENT_ITEM_LENGTH,

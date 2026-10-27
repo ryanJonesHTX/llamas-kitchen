@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { recipeInputSchema } from '../../lib/recipes/input'
 import {
   MAX_INGREDIENT_ITEM_LENGTH,
+  MAX_INGREDIENT_QUANTITY,
   MAX_INGREDIENT_UNIT_LENGTH,
   MAX_RECIPE_CREDIT_LENGTH,
   MAX_RECIPE_DESCRIPTION_LENGTH,
@@ -171,6 +172,25 @@ describe('recipeInputSchema', () => {
       expectIssueOn(validInput({ steps: ['Mix.', '  '] }), 'steps')
       expect(parsed(validInput({ steps: [' Mix. ', 'Bake.\n'] })).steps).toEqual(['Mix.', 'Bake.'])
     })
+
+    it.each([
+      ['three newlines', 'Mix.\n\n\nBake.'],
+      ['many newlines', 'Mix.\n\n\n\n\n\nBake.'],
+      ['\\r\\n line endings', 'Mix.\r\n\r\n\r\nBake.'],
+      ['whitespace-only lines', 'Mix.\n \t\n  \nBake.'],
+    ])('collapses blank lines in a step to one (%s)', (_label, step) => {
+      expect(parsed(validInput({ steps: [step] })).steps).toEqual(['Mix.\n\nBake.'])
+    })
+
+    it('keeps a single blank line and single line breaks in a step', () => {
+      const step = 'Mix.\n\nBake.\nServe.'
+      expect(parsed(validInput({ steps: [step] })).steps).toEqual([step])
+    })
+
+    it('checks step length after collapsing blank lines', () => {
+      const text = 'x'.repeat(MAX_RECIPE_STEP_LENGTH - 3)
+      expect(parsed(validInput({ steps: [`${text}\n\n\n\n\nx`] })).steps).toEqual([`${text}\n\nx`])
+    })
   })
 
   describe('tags', () => {
@@ -245,6 +265,13 @@ describe('recipeInputSchema', () => {
       'steps',
       (n) => ({ steps: Array.from({ length: n }, () => 'Mix.') }),
       `at most ${MAX_RECIPE_STEPS} steps`,
+    ],
+    [
+      'ingredient quantity',
+      MAX_INGREDIENT_QUANTITY,
+      'ingredients',
+      (n) => ({ ingredients: [{ quantity: n, unit: 'cups', item: 'flour' }] }),
+      `each ingredient quantity must be at most ${MAX_INGREDIENT_QUANTITY}`,
     ],
     [
       'ingredient item length',

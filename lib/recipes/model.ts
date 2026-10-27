@@ -4,6 +4,7 @@
 import mongoose, { type Types } from 'mongoose'
 import {
   MAX_INGREDIENT_ITEM_LENGTH,
+  MAX_INGREDIENT_QUANTITY,
   MAX_INGREDIENT_UNIT_LENGTH,
   MAX_RECIPE_CREDIT_LENGTH,
   MAX_RECIPE_DESCRIPTION_LENGTH,
@@ -65,6 +66,7 @@ const ingredientSchema = new Schema<Ingredient>(
     quantity: {
       type: Number,
       default: null,
+      max: MAX_INGREDIENT_QUANTITY,
       validate: { validator: (quantity: number | null) => quantity === null || quantity > 0, message: 'must be > 0' },
     },
     unit: { type: String, trim: true, default: null, maxlength: MAX_INGREDIENT_UNIT_LENGTH },

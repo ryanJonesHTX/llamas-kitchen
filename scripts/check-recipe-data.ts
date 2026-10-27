@@ -1,10 +1,12 @@
 // Read-only report on stored recipes, run before tightening the input schema:
 // - recipes whose imagePublicId is outside the upload folder's pattern
 //   (the v2 migration copied old cloudinaryId values unchanged);
-// - the longest value and largest count per text field, to check the limits fit.
+// - the longest value and largest count per text field, to check the limits fit;
+// - recipes with an ingredient quantity above MAX_INGREDIENT_QUANTITY.
 //   MONGODB_URI=... node scripts/check-recipe-data.ts
 // Reads only MONGODB_URI from the environment; no .env file is loaded.
 import mongoose from 'mongoose'
+import { MAX_INGREDIENT_QUANTITY } from '../lib/constants.ts'
 import { Recipe, type RecipeRecord } from '../lib/recipes/model.ts'
 import { IMAGE_PUBLIC_ID_PATTERN } from '../lib/uploads.ts'
 
@@ -43,6 +45,16 @@ try {
     steps: Math.max(0, ...recipes.map((recipe) => recipe.steps.length)),
     ingredients: Math.max(0, ...recipes.map((recipe) => recipe.ingredients.length)),
   })
+
+  const tooLarge = recipes.flatMap(({ _id, slug, status, ingredients }) =>
+    ingredients
+      .filter((ingredient) => (ingredient.quantity ?? 0) > MAX_INGREDIENT_QUANTITY)
+      .map((ingredient) => ({ _id, slug, status, ingredient }))
+  )
+  for (const { _id, slug, status, ingredient } of tooLarge) {
+    console.log(`${_id}  ${slug}  ${status}  ${JSON.stringify(ingredient)}`)
+  }
+  console.log(`Ingredient quantities above ${MAX_INGREDIENT_QUANTITY}: ${tooLarge.length}`)
 } finally {
   await mongoose.disconnect()
 }

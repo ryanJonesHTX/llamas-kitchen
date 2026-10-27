@@ -33,6 +33,9 @@ export const MAX_INGREDIENT_UNIT_LENGTH = 40
 export const MAX_RECIPE_INGREDIENTS = 100
 export const MAX_RECIPE_TAG_LENGTH = 40
 
+// The largest ingredient quantity, in whatever unit it has.
+export const MAX_INGREDIENT_QUANTITY = 10000
+
 // Recipes a non-admin may have awaiting review at once. Admins are exempt.
 export const MAX_PENDING_PER_USER = 5
 

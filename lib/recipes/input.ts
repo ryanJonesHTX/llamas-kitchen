@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   MAX_INGREDIENT_ITEM_LENGTH,
+  MAX_INGREDIENT_QUANTITY,
   MAX_INGREDIENT_UNIT_LENGTH,
   MAX_RECIPE_CREDIT_LENGTH,
   MAX_RECIPE_DESCRIPTION_LENGTH,
@@ -39,6 +40,11 @@ export function normalizeTag(tag: string): string {
   return tag.trim().toLowerCase()
 }
 
+// Runs of blank lines in a step (whitespace-only lines count) become one blank line.
+function collapseBlankLines(step: string): string {
+  return step.replace(/\r\n/g, '\n').replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, '\n\n')
+}
+
 // What a person or the import parser supplies. The server sets submittedBy,
 // status, rejectionReason, publishedAt and slug. Unknown keys are stripped, so
 // the parse output is the whitelist of fields input may write. A list entry's
@@ -50,7 +56,11 @@ export const recipeInputSchema = z.object({
   ingredients: z
     .array(
       z.object({
-        quantity: z.number().positive().nullable(),
+        quantity: z
+          .number()
+          .positive()
+          .max(MAX_INGREDIENT_QUANTITY, `each ingredient quantity must be at most ${MAX_INGREDIENT_QUANTITY}`)
+          .nullable(),
         unit: z
           .string()
           .trim()
@@ -65,7 +75,14 @@ export const recipeInputSchema = z.object({
     .min(1, 'Add at least one ingredient')
     .max(MAX_RECIPE_INGREDIENTS, `at most ${MAX_RECIPE_INGREDIENTS} ingredients`),
   steps: z
-    .array(requiredText.max(MAX_RECIPE_STEP_LENGTH, `each step must be at most ${MAX_RECIPE_STEP_LENGTH} characters`))
+    .array(
+      z
+        .string()
+        .overwrite(collapseBlankLines)
+        .trim()
+        .min(1)
+        .max(MAX_RECIPE_STEP_LENGTH, `each step must be at most ${MAX_RECIPE_STEP_LENGTH} characters`)
+    )
     .min(1, 'Add at least one step')
     .max(MAX_RECIPE_STEPS, `at most ${MAX_RECIPE_STEPS} steps`),
   servings: wholeNumber(1),
