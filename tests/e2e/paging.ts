@@ -1,10 +1,14 @@
 import type { Page } from '@playwright/test'
 import { seedRecipe, type SeedRecipe } from './fixtures.ts'
+import { expect } from './test.ts'
 
 // Paging recipes for the /recipes grid: quick recipes tagged "paging", all
 // published at the same instant (before every seed recipe), so pages split
 // inside a tie on publishedAt and the order within it comes from _id alone.
 // Newest first they come by _id descending, after the seeds.
+
+// The seed recipes, newest first. The paging recipes come after them.
+export const newestFirst = ['E2E Pork Chops', 'E2E Chicken Curry', 'E2E Beef Burgers', 'E2E Chicken Tacos', 'E2E Beef Stew']
 
 export const pagingName = (n: number) => `E2E Paging ${String(n).padStart(2, '0')}`
 
@@ -43,4 +47,33 @@ export async function disableAutoLoad(page: Page) {
       }
     } as unknown as typeof IntersectionObserver
   })
+}
+
+export const recipeGridNames = (page: Page) =>
+  page
+    .getByRole('region', { name: 'Recipes', exact: true })
+    .getByRole('heading', { level: 3 })
+export const moreRecipesButton = (page: Page) => page.getByRole('button', { name: 'More recipes', exact: true })
+export const moreRecipes = (page: Page) =>
+  moreRecipesButton(page).or(page.getByRole('link', { name: 'More recipes', exact: true }))
+export const endOfList = (page: Page) => page.getByText("That's every recipe.", { exact: true })
+
+// Resolves once two frames have rendered, after which intersection observers have had their say.
+export const renderedFrames = (page: Page) =>
+  page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve)))))
+
+// Every /api/recipes request the page makes, in order.
+export function apiRequests(page: Page): URL[] {
+  const urls: URL[] = []
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === '/api/recipes') urls.push(url)
+  })
+  return urls
+}
+
+// The hydrated grid: "More recipes" is a button once the client takes over.
+export async function openListing(page: Page, path: string) {
+  await page.goto(path)
+  await expect(moreRecipesButton(page)).toBeVisible()
 }

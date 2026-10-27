@@ -2,7 +2,20 @@ import type { Page, Route } from '@playwright/test'
 import { RECIPE_PAGE_SIZE } from '../../lib/constants.ts'
 import { expect, test } from './test.ts'
 import { disconnect, insertRecipes, reseed } from './db.ts'
-import { disableAutoLoad, pagingName, pagingRecipes, range } from './paging.ts'
+import {
+  apiRequests,
+  disableAutoLoad,
+  endOfList,
+  moreRecipes,
+  moreRecipesButton,
+  newestFirst,
+  openListing,
+  pagingName,
+  pagingRecipes,
+  range,
+  recipeGridNames,
+  renderedFrames,
+} from './paging.ts'
 
 // The /recipes grid appends further pages in place from /api/recipes: when
 // the end of the grid scrolls into view, or from the "More recipes" button.
@@ -19,22 +32,13 @@ test.afterAll(async () => {
 
 // Three pages: the seeds and the paging recipes by _id descending.
 const PAGING_COUNT = 2 * RECIPE_PAGE_SIZE + 3
-const newestFirst = ['E2E Pork Chops', 'E2E Chicken Curry', 'E2E Beef Burgers', 'E2E Chicken Tacos', 'E2E Beef Stew']
 const everyRecipe = [...newestFirst, ...range(PAGING_COUNT, 1).map(pagingName)]
 const firstPage = everyRecipe.slice(0, RECIPE_PAGE_SIZE)
 const firstTwoPages = everyRecipe.slice(0, 2 * RECIPE_PAGE_SIZE)
 const lastPageSize = everyRecipe.length - 2 * RECIPE_PAGE_SIZE
 
-const recipeGridNames = (page: Page) =>
-  page
-    .getByRole('region', { name: 'Recipes', exact: true })
-    .getByRole('heading', { level: 3 })
-const moreRecipesButton = (page: Page) => page.getByRole('button', { name: 'More recipes', exact: true })
-const moreRecipes = (page: Page) =>
-  moreRecipesButton(page).or(page.getByRole('link', { name: 'More recipes', exact: true }))
 const tryAgain = (page: Page) => page.getByRole('button', { name: 'Try again', exact: true })
 const loadFailed = (page: Page) => page.getByText("Couldn't load more recipes.", { exact: true })
-const endOfList = (page: Page) => page.getByText("That's every recipe.", { exact: true })
 // The visually hidden live region; only its text is checked.
 const announcement = (page: Page) => page.getByRole('status').filter({ hasText: /^Loaded \d+ more recipes$/ })
 // The same region whatever it holds, empty included.
@@ -42,25 +46,6 @@ const gridStatus = (page: Page) => page.getByRole('region', { name: 'Recipes', e
 
 const scrollToEnd = (page: Page) => page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
 const scrollToTop = (page: Page) => page.evaluate(() => window.scrollTo(0, 0))
-// Resolves once two frames have rendered, after which intersection observers have had their say.
-const renderedFrames = (page: Page) =>
-  page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve)))))
-
-// Every /api/recipes request the page makes, in order.
-function apiRequests(page: Page): URL[] {
-  const urls: URL[] = []
-  page.on('request', (request) => {
-    const url = new URL(request.url())
-    if (url.pathname === '/api/recipes') urls.push(url)
-  })
-  return urls
-}
-
-// The hydrated grid: "More recipes" is a button once the client takes over.
-async function openListing(page: Page, path: string) {
-  await page.goto(path)
-  await expect(moreRecipesButton(page)).toBeVisible()
-}
 
 test.describe('infinite scroll', () => {
   test.beforeEach(async () => {

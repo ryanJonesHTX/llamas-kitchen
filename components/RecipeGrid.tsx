@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { RecipeCardData } from '../lib/recipes/card'
+import { historyEntryKey, readGrid, saveGrid } from '../lib/recipes/gridHistory'
 import type { ListingQuery } from '../lib/recipes/listing'
 import { listingHref, listingSearch } from '../lib/recipes/listingHref'
 import RecipeCard from './RecipeCard'
@@ -10,7 +11,8 @@ import RecipeCard from './RecipeCard'
 // The /recipes grid: the server's page of cards, then the pages appended from
 // /api/recipes, when the end of the grid comes near the viewport or from the
 // "More recipes" button. The URL stays the same. Without JavaScript, "More
-// recipes" is a link to the next page.
+// recipes" is a link to the next page. Back and Forward to the same history
+// entry restore the appended pages and the scroll position.
 
 type ListingState = Pick<ListingQuery, 'tags' | 'time' | 'sort' | 'q'>
 type RecipePage = { recipes: RecipeCardData[]; nextCursor: string | null }
@@ -33,6 +35,8 @@ const controlClass =
   'inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface px-5 text-base font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft'
 
 export default function RecipeGrid({ state, firstPage }: { state: ListingState; firstPage: RecipePage }) {
+  // The grid's identity, as app/recipes/page.tsx keys it: saved pages restore only to the same one.
+  const listing = `${listingHref(state)}#${firstPage.recipes[0].id}`
   const hydrated = useHydrated()
   const [appended, setAppended] = useState<RecipeCardData[]>([])
   const [nextCursor, setNextCursor] = useState(firstPage.nextCursor)
@@ -43,6 +47,9 @@ export default function RecipeGrid({ state, firstPage }: { state: ListingState; 
   // The request in flight, so there is only ever one, and unmounting aborts it.
   const inFlight = useRef<AbortController | null>(null)
   const sentinel = useRef<HTMLDivElement>(null)
+  // This history entry's key for saving the grid, and a restored scroll position waiting for its cards.
+  const entry = useRef('')
+  const restoredScrollY = useRef<number | null>(null)
 
   async function loadMore() {
     if (inFlight.current || nextCursor === null) return
@@ -83,6 +90,34 @@ export default function RecipeGrid({ state, firstPage }: { state: ListingState; 
   }, [autoLoad])
 
   useEffect(() => () => inFlight.current?.abort(), [])
+
+  // Before the first paint, restores the pages this entry had appended to this listing.
+  useLayoutEffect(() => {
+    entry.current = historyEntryKey()
+    const saved = readGrid(entry.current, listing)
+    if (!saved) return
+    restoredScrollY.current = saved.scrollY
+    setAppended(saved.appended)
+    setNextCursor(saved.nextCursor)
+    setLoadedMore(true)
+  }, [listing])
+
+  // Then scrolls once the restored cards are in the page, before the first paint and after Next's own scroll
+  // handling. The browser's scroll restoration may run later, to the same position.
+  useLayoutEffect(() => {
+    if (restoredScrollY.current === null || appended.length === 0) return
+    window.scrollTo(0, restoredScrollY.current)
+    restoredScrollY.current = null
+  }, [appended])
+
+  // Saves on every change and scroll, so leaving at any moment keeps the latest.
+  useEffect(() => {
+    if (appended.length === 0) return
+    const save = () => saveGrid(entry.current, { listing, appended, nextCursor, scrollY: window.scrollY })
+    save()
+    window.addEventListener('scroll', save, { passive: true })
+    return () => window.removeEventListener('scroll', save)
+  }, [listing, appended, nextCursor])
 
   return (
     <>
