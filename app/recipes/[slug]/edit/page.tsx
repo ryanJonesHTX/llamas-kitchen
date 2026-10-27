@@ -15,7 +15,7 @@ function formValues(recipe: RecipeRecord): RecipeFormValues {
     slug: recipe.slug,
     description: recipe.description,
     ingredients: recipe.ingredients.map((ingredient) => ({ line: formatIngredient(ingredient) })),
-    steps: recipe.steps.join('\n'),
+    steps: recipe.steps.map((text) => ({ text })),
     tags: recipe.tags,
     servings: String(recipe.servings),
     prepTime: String(recipe.prepTime),

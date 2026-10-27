@@ -62,11 +62,11 @@ export const recipeInputSchema = z.object({
         ),
       })
     )
-    .min(1)
+    .min(1, 'Add at least one ingredient')
     .max(MAX_RECIPE_INGREDIENTS, `at most ${MAX_RECIPE_INGREDIENTS} ingredients`),
   steps: z
     .array(requiredText.max(MAX_RECIPE_STEP_LENGTH, `each step must be at most ${MAX_RECIPE_STEP_LENGTH} characters`))
-    .min(1)
+    .min(1, 'Add at least one step')
     .max(MAX_RECIPE_STEPS, `at most ${MAX_RECIPE_STEPS} steps`),
   servings: wholeNumber(1),
   prepTime: wholeNumber(0),

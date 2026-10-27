@@ -20,19 +20,11 @@ import { recipeInputSchema } from '../lib/recipes/input'
 import type { RecipeStatus } from '../lib/recipes/model'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
 import RecipeStatusBanner from './RecipeStatusBanner'
-import { SortableIngredient, SortableIngredients } from './SortableIngredients'
+import { SortableItem, SortableList } from './SortableList'
 import TagInput from './TagInput'
 
-// The trimmed, non-blank pieces of `text`.
-function nonBlankParts(text: string, separator: string): string[] {
-  return text
-    .split(separator)
-    .map((part) => part.trim())
-    .filter(Boolean)
-}
-
-// recipeInputSchema over the form's text fields: one ingredient per line
-// (blank lines skipped), one step per line. Tags are already a list. Its output
+// recipeInputSchema over the form's text fields: one ingredient per row and
+// one step per row, blank rows skipped. Tags are already a list. Its output
 // is the action input. The server checks the slug, so here it's any string.
 const recipeFormSchema = recipeInputSchema.extend({
   ingredients: z
@@ -40,8 +32,8 @@ const recipeFormSchema = recipeInputSchema.extend({
     .transform((rows) => rows.map((row) => row.line).filter((line) => line.trim()).map(parseIngredient))
     .pipe(recipeInputSchema.shape.ingredients),
   steps: z
-    .string()
-    .transform((text) => nonBlankParts(text, '\n'))
+    .array(z.object({ text: z.string() }))
+    .transform((rows) => rows.map((row) => row.text.trim()).filter(Boolean))
     .pipe(recipeInputSchema.shape.steps),
   slug: z.string().optional(),
 })
@@ -54,7 +46,7 @@ const EMPTY_VALUES: RecipeFormValues = {
   name: '',
   description: '',
   ingredients: [{ line: '' }],
-  steps: '',
+  steps: [{ text: '' }],
   tags: [],
   servings: '',
   prepTime: '',
@@ -104,7 +96,7 @@ function errorProps(id: string, error: string | undefined) {
 
 // A list field's first message, wherever it was filed: on the list itself
 // (setError), under its root (the resolver, for a field array), or under an
-// entry's index (an over-long step, say), which has no input of its own.
+// entry's index (an over-long step, say).
 function listError(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined
   if ('message' in error && typeof error.message === 'string') return error.message
@@ -112,6 +104,15 @@ function listError(error: unknown): string | undefined {
     const message = key === 'ref' ? undefined : listError(value)
     if (message) return message
   }
+}
+
+// The steps row an error belongs to. The schema counts non-blank steps only,
+// so an error under index N is the (N+1)th non-blank row's; one on the list
+// itself goes to the first non-blank row, or the first row if all are blank.
+function stepErrorRow(error: unknown, rows: { text: string }[]): number {
+  const index = Number(Object.keys(error ?? {}).find((key) => /^\d+$/.test(key)) ?? 0)
+  const nonBlankRows = rows.flatMap((row, rowIndex) => (row.text.trim() ? [rowIndex] : []))
+  return nonBlankRows[index] ?? 0
 }
 
 function FieldError({ id, error }: { id: string; error: string | undefined }) {
@@ -149,7 +150,7 @@ function Field({
 }
 
 // One group of fields on a surface card. Not a named region: the heading is
-// enough to navigate by, and a "Steps" region would clash with the Steps label.
+// enough to navigate by.
 function Card({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section className={CARD}>
@@ -217,6 +218,8 @@ export default function RecipeForm({
   const {
     control,
     formState: { errors, isSubmitting },
+    getFieldState,
+    getValues,
     handleSubmit,
     register,
     setError,
@@ -225,11 +228,13 @@ export default function RecipeForm({
   } = useForm<RecipeFormValues, unknown, RecipeFormOutput>({
     resolver: zodResolver(recipeFormSchema),
     defaultValues: initialValues,
-    // showInvalid does it: RHF can't match an ingredients error to the
-    // ingredient inputs, which are registered as ingredients.N.line.
+    // showInvalid does it: RHF can't match an ingredients or steps error to
+    // the rows' inputs, which are registered as ingredients.N.line and steps.N.text.
     shouldFocusError: false,
   })
   const ingredients = useFieldArray({ control, name: 'ingredients' })
+  const steps = useFieldArray({ control, name: 'steps' })
+  const stepRows = useWatch({ control, name: 'steps' })
   const imagePublicId = useWatch({ control, name: 'imagePublicId' })
   const previewSrc = localPreview ?? (imagePublicId ? `${imageUrlPrefix}${imagePublicId}` : null)
 
@@ -242,13 +247,18 @@ export default function RecipeForm({
   const stepsError = listError(errors.steps)
   const tagsError = listError(errors.tags)
 
+  const stepsErrorRow = stepErrorRow(errors.steps, stepRows)
+
   // Shows errors that have no input in the alert, and focuses the first
-  // invalid input; errors on the ingredients list focus its first input.
+  // invalid input; errors on the ingredients list focus its first input, and
+  // errors on the steps the step they belong to.
   function showInvalid(invalid: string[]) {
     const noInput = Object.entries(NO_INPUT_ERRORS).find(([name]) => invalid.includes(name))
     if (noInput) setError('root.server', { message: noInput[1] })
     const first = FIELD_ORDER.find((name) => invalid.includes(name))
-    if (first) setFocus(first === 'ingredients' ? 'ingredients.0.line' : first)
+    if (first === 'ingredients') setFocus('ingredients.0.line')
+    else if (first === 'steps') setFocus(`steps.${stepErrorRow(getFieldState('steps').error, getValues('steps'))}.text`)
+    else if (first) setFocus(first)
   }
 
   async function save(values: RecipeFormOutput) {
@@ -387,7 +397,9 @@ export default function RecipeForm({
 
         <Card id="ingredients" title="Ingredients">
           <div>
-            <SortableIngredients
+            <SortableList
+              noun="ingredient"
+              article="an"
               ids={ingredients.fields.map((field) => field.id)}
               onMove={ingredients.move}
               labelledBy="ingredients-heading"
@@ -395,7 +407,13 @@ export default function RecipeForm({
               {ingredients.fields.map((field, index) => {
                 const n = index + 1
                 return (
-                  <SortableIngredient key={field.id} id={field.id} n={n} onRemove={() => ingredients.remove(index)}>
+                  <SortableItem
+                    key={field.id}
+                    noun="ingredient"
+                    id={field.id}
+                    n={n}
+                    onRemove={() => ingredients.remove(index)}
+                  >
                     <label htmlFor={`ingredient-${n}`} className="sr-only">
                       {`Ingredient ${n}`}
                     </label>
@@ -407,10 +425,10 @@ export default function RecipeForm({
                       {...register(`ingredients.${index}.line`)}
                       {...errorProps('ingredients', ingredientsError)}
                     />
-                  </SortableIngredient>
+                  </SortableItem>
                 )
               })}
-            </SortableIngredients>
+            </SortableList>
             <FieldError id="ingredients" error={ingredientsError} />
             <button
               type="button"
@@ -423,21 +441,50 @@ export default function RecipeForm({
           </div>
         </Card>
 
-        {/* The heading is the textarea's label, so "Steps" isn't shown twice. */}
-        <section className={CARD}>
-          <h2 className={CARD_HEADING}>
-            <label htmlFor="steps">Steps</label>
-          </h2>
-          <textarea
-            id="steps"
-            rows={8}
-            className={`mt-4 ${INPUT}`}
-            {...register('steps')}
-            {...errorProps('steps', stepsError)}
-          />
-          <p className={HELP}>One step per line.</p>
-          <FieldError id="steps" error={stepsError} />
-        </section>
+        <Card id="steps" title="Steps">
+          <div>
+            <SortableList
+              noun="step"
+              article="a"
+              ids={steps.fields.map((field) => field.id)}
+              onMove={steps.move}
+              labelledBy="steps-heading"
+            >
+              {steps.fields.map((field, index) => {
+                const n = index + 1
+                return (
+                  <SortableItem key={field.id} noun="step" id={field.id} n={n} onRemove={() => steps.remove(index)}>
+                    <label htmlFor={`step-${n}`} className="sr-only">
+                      {`Step ${n}`}
+                    </label>
+                    {/* The label already says "Step N"; this is the visible number, centred on the first line. */}
+                    <span
+                      aria-hidden="true"
+                      className="mt-2 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-on-accent-soft tabular-nums"
+                    >
+                      {n}
+                    </span>
+                    {/* Grows with its text where field-sizing is supported (rows is then
+                        ignored); elsewhere, Firefox say, it's three rows tall and scrolls.
+                        Enter is a line break within the step. */}
+                    <textarea
+                      id={`step-${n}`}
+                      rows={3}
+                      className={`${INPUT} field-sizing-content`}
+                      {...register(`steps.${index}.text`)}
+                      {...(index === stepsErrorRow ? errorProps('steps', stepsError) : {})}
+                    />
+                  </SortableItem>
+                )
+              })}
+            </SortableList>
+            <FieldError id="steps" error={stepsError} />
+            <button type="button" className={`mt-4 ${SECONDARY_BUTTON}`} onClick={() => steps.append({ text: '' })}>
+              <PlusIcon className="h-5 w-5" aria-hidden="true" />
+              Add step
+            </button>
+          </div>
+        </Card>
 
         <Card id="times" title="Times & servings">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">

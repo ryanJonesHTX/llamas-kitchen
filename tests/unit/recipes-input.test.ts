@@ -42,6 +42,13 @@ function parsed(input: Input) {
   return result.data as Input
 }
 
+// The message of each issue, like ['ingredients: Add at least one ingredient'].
+function issueMessages(input: Input): string[] {
+  const result = recipeInputSchema.safeParse(input)
+  expect(result.success, 'expected invalid input').toBe(false)
+  return result.error!.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+}
+
 // The paths of every issue, like ['name', 'ingredients.0.item'].
 function issuePaths(input: Input): string[] {
   const result = recipeInputSchema.safeParse(input)
@@ -140,7 +147,7 @@ describe('recipeInputSchema', () => {
 
   describe('ingredients and steps', () => {
     it('needs at least one ingredient', () => {
-      expectIssueOn(validInput({ ingredients: [] }), 'ingredients')
+      expect(issueMessages(validInput({ ingredients: [] }))).toEqual(['ingredients: Add at least one ingredient'])
     })
 
     it.each([[0], [-1]])('rejects an ingredient quantity of %j', (quantity) => {
@@ -157,7 +164,7 @@ describe('recipeInputSchema', () => {
     })
 
     it('needs at least one step', () => {
-      expectIssueOn(validInput({ steps: [] }), 'steps')
+      expect(issueMessages(validInput({ steps: [] }))).toEqual(['steps: Add at least one step'])
     })
 
     it('rejects a blank step and trims the others', () => {

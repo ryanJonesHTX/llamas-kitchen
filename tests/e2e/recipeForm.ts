@@ -12,6 +12,27 @@ export const ingredientLine = (page: Page, n: number) => formField(page, `Ingred
 export const reorderHandle = (page: Page, n: number) =>
   page.getByRole('button', { name: `Reorder ingredient ${n}`, exact: true })
 
+// Steps are a list of textareas too, numbered from 1: "Step 1", "Step 2", ...
+// Each has a "Reorder step N" handle and a "Remove step N" button.
+export const stepField = (page: Page, n: number) => formField(page, `Step ${n}`)
+
+export const reorderStepHandle = (page: Page, n: number) =>
+  page.getByRole('button', { name: `Reorder step ${n}`, exact: true })
+
+export const removeStepButton = (page: Page, n: number) =>
+  page.getByRole('button', { name: `Remove step ${n}`, exact: true })
+
+export const addStepButton = (page: Page) => page.getByRole('button', { name: 'Add step', exact: true })
+
+// Fills one step per row on a form that starts with one empty step (/new),
+// adding a row for each step after the first.
+export async function fillSteps(page: Page, steps: string[]): Promise<void> {
+  for (const [index, step] of steps.entries()) {
+    if (index > 0) await addStepButton(page).click()
+    await stepField(page, index + 1).fill(step)
+  }
+}
+
 // The tag input is a combobox labelled "Tags"; its chips are the "Selected tags" list.
 export const tagInput = (page: Page) => page.getByRole('combobox', { name: 'Tags', exact: true })
 
@@ -74,7 +95,7 @@ export async function fillNewRecipe(page: Page): Promise<void> {
   await ingredientLine(page, 1).fill(newRecipe.ingredients[0])
   await page.getByRole('button', { name: 'Add ingredient', exact: true }).click()
   await ingredientLine(page, 2).fill(newRecipe.ingredients[1])
-  await formField(page, 'Steps').fill(newRecipe.steps.join('\n'))
+  await fillSteps(page, newRecipe.steps)
   await addTags(page, newRecipe.tags)
   await formField(page, 'Servings').fill(newRecipe.servings)
   await formField(page, 'Prep time (minutes)').fill(newRecipe.prepTime)

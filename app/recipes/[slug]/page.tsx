@@ -133,7 +133,7 @@ export default async function RecipePage({ params }: Props) {
                   >
                     {index + 1}
                   </span>
-                  <p className="min-w-0 pt-1 text-lg leading-8 text-text">{step}</p>
+                  <p className="min-w-0 whitespace-pre-line pt-1 text-lg leading-8 text-text">{step}</p>
                 </li>
               ))}
             </ol>

@@ -5,7 +5,7 @@ import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { deleteAllRecipes, disconnect, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
-import { addTags, saveButton, tagInput } from './recipeForm.ts'
+import { addTags, fillSteps, saveButton, stepField, tagInput } from './recipeForm.ts'
 import { disableAutoLoad, pagingRecipes } from './paging.ts'
 import { openRecipe } from './recipePage.ts'
 
@@ -152,6 +152,15 @@ const scenarios: Scenario[] = [
       await page.goto('/new')
       await saveButton(page).click()
       await expect(page.locator('[aria-invalid="true"]').first()).toBeVisible()
+    },
+  },
+  {
+    name: 'new recipe form with three steps, one of them on two lines',
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await page.goto('/new')
+      await fillSteps(page, ['Boil the water.', 'Add the pasta.\nStir now and then.', 'Drain it.'])
+      await expect(stepField(page, 3)).toHaveValue('Drain it.')
     },
   },
   {
