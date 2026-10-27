@@ -21,6 +21,8 @@ const fixtures = [
   recipeDoc({ _id: id(5), name: 'Lemon Rice', slug: 'lemon-rice', publishedAt: day(8), ingredients: items('rice', 'chicken stock'), tags: ['side'] }),
   pendingDoc({ _id: id(6), name: 'Lemon Pending Pie', slug: 'lemon-pending-pie', createdAt: day(10) }),
   rejectedDoc({ _id: id(7), name: 'Lemon Rejected Cake', slug: 'lemon-rejected-cake', createdAt: day(10) }),
+  recipeDoc({ _id: id(8), name: 'Crème Brûlée', slug: 'creme-brulee', publishedAt: day(6), ingredients: items('cream', 'sugar'), tags: ['dessert'] }),
+  recipeDoc({ _id: id(9), name: 'Berry Parfait', slug: 'berry-parfait', publishedAt: day(1), ingredients: items('crème fraîche', 'berries'), tags: ['dessert'] }),
 ]
 
 const names = async (words: string[], limit = 8) => (await queries.searchPublished(words, limit)).map((hit) => hit.name)
@@ -48,6 +50,12 @@ describe('searchPublished', () => {
     // Lemon Rice has "chicken" only in an ingredient.
     expect(await names(['lemon', 'chicken'])).toEqual(['Lemon Chicken', 'Lemon Rice'])
     expect(await names(['lem', 'chic'])).toEqual(['Lemon Chicken', 'Lemon Rice'])
+  })
+
+  it('ignores accents, keeping the name group first', async () => {
+    // Berry Parfait is newer but has "crème" only in an ingredient.
+    expect(await names(['creme'])).toEqual(['Crème Brûlée', 'Berry Parfait'])
+    expect(await names(['brulee'])).toEqual(['Crème Brûlée'])
   })
 
   it('returns at most limit recipes, filling from the second group', async () => {

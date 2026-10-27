@@ -326,6 +326,21 @@ test.describe('recipe search', () => {
     await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Curry', 'E2E Chicken Tacos'])
   })
 
+  test('ignores accents', async ({ page }) => {
+    await insertRecipes([
+      {
+        ...seedRecipe('E2E Chicken Tacos'),
+        _id: '65c000000000000000000001',
+        name: 'E2E Crème Brûlée',
+        slug: 'e2e-creme-brulee',
+      },
+    ])
+
+    await page.goto('/recipes?q=creme+brulee')
+
+    await expect(recipeGridNames(page)).toHaveText(['E2E Crème Brûlée'])
+  })
+
   test('a new search keeps the filters and sort', async ({ page }) => {
     await page.goto('/recipes?tag=chicken&tag=pork&sort=oldest')
 

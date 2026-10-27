@@ -40,6 +40,10 @@ const published = [
   { name: '5 Spice Pork', ingredients: items('five-spice powder', 'pork belly'), tags: ['dinner'], prepTime: 10, cookTime: 90 },
   { name: 'Beef Stew', ingredients: items('stewing beef', 'carrots'), tags: ['main dish'], prepTime: 20, cookTime: 120 },
   { name: 'Lemon Chicken', ingredients: items('chicken breast', 'lemon'), tags: ['dinner', 'quick'], prepTime: 10, cookTime: 10 },
+  { name: 'Creme Caramel', ingredients: items('eggs', 'milk'), tags: ['pâtisserie'], prepTime: 20, cookTime: 50 },
+  { name: 'Smørrebrød', ingredients: items('rye bread', 'rémoulade'), tags: ['danish'], prepTime: 15, cookTime: 0 },
+  { name: 'Phở Bò', ingredients: items('brisket', 'star anise'), tags: ['vietnamese'], prepTime: 30, cookTime: 180 },
+  { name: '김치 Jjigae', ingredients: items('kimchi', 'tofu'), tags: ['korean'], prepTime: 10, cookTime: 30 },
 ]
 const NEWEST = published.map((r) => r.name)
 
@@ -94,6 +98,8 @@ describe('searchWords', () => {
     ['a.b', ['a', 'b']],
     ['chicken Chicken CHICKEN', ['chicken']],
     ['Jalapeño CRÈME brûlée', ['jalapeño', 'crème', 'brûlée']],
+    // Decomposed: "e" + combining grave accent.
+    ['cre\u0300me', ['crème']],
     ['5 spice 2x', ['5', 'spice', '2x']],
     ['', []],
     ['!!! ... ()*', []],
@@ -207,8 +213,42 @@ describe('search through listPublished', () => {
       expect(await search('o poppers')).toEqual([])
     })
 
-    it('are not folded to their ASCII base letter', async () => {
-      expect(await search('creme')).toEqual([])
+    it('ignore accents both ways', async () => {
+      expect(await search('creme')).toEqual(['Crème Brûlée', 'Creme Caramel'])
+      expect(await search('crème')).toEqual(['Crème Brûlée', 'Creme Caramel'])
+      expect(await search('CRÈME')).toEqual(['Crème Brûlée', 'Creme Caramel'])
+      expect(await search('Creme')).toEqual(['Crème Brûlée', 'Creme Caramel'])
+      expect(await search('brulee')).toEqual(['Crème Brûlée'])
+      expect(await search('evora')).toEqual(['Évora Bread'])
+    })
+
+    // ở is outside the table and 김 would split into jamo under NFD: both must match exactly.
+    it('match letters outside the accent table as themselves', async () => {
+      expect(await search('phở')).toEqual(['Phở Bò'])
+      expect(await search('bò')).toEqual(['Phở Bò'])
+      expect(await search('김치')).toEqual(['김치 Jjigae'])
+    })
+
+    it('read decomposed input as one word', async () => {
+      // "e" + combining grave accent.
+      expect(await search('cre\u0300me')).toEqual(['Crème Brûlée', 'Creme Caramel'])
+    })
+
+    it('ignore accents in an ingredient item and a tag', async () => {
+      expect(await search('jalapeno')).toEqual(['Jalapeño Poppers'])
+      expect(await search('remoulade')).toEqual(['Smørrebrød'])
+      expect(await search('patisserie')).toEqual(['Creme Caramel'])
+    })
+
+    it('keep the word-start rule', async () => {
+      expect(await search('reme')).toEqual([])
+      expect(await search('rème')).toEqual([])
+    })
+
+    // Only letters that decompose to an ASCII letter plus marks fold; ø does not.
+    it('fold only letters that decompose to a base letter', async () => {
+      expect(await search('smorre')).toEqual([])
+      expect(await search('smørre')).toEqual(['Smørrebrød'])
     })
   })
 
@@ -250,7 +290,10 @@ describe('search through listPublished', () => {
   describe('paging through search results yields every match exactly once, in order', () => {
     const cases = [
       { q: 'dinner', newest: ['Chicken Thighs with Rice', '5 Spice Pork', 'Lemon Chicken'] },
-      { q: 'c', newest: ['Chicken Thighs with Rice', 'Jalapeño Poppers', 'Crème Brûlée', 'Beef Stew', 'Lemon Chicken'] },
+      {
+        q: 'c',
+        newest: ['Chicken Thighs with Rice', 'Jalapeño Poppers', 'Crème Brûlée', 'Beef Stew', 'Lemon Chicken', 'Creme Caramel'],
+      },
     ]
     const runs = cases.flatMap((c) =>
       [undefined, 'oldest'].flatMap((sort) =>
