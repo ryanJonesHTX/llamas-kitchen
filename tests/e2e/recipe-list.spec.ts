@@ -2,7 +2,8 @@ import type { Page } from '@playwright/test'
 import { MAX_SEARCH_QUERY_LENGTH, MAX_SEARCH_WORDS, RECIPE_PAGE_SIZE } from '../../lib/constants.ts'
 import { expect, test } from './test.ts'
 import { disconnect, insertRecipes, reseed } from './db.ts'
-import { publishedRecipes, seedRecipe, type SeedRecipe } from './fixtures.ts'
+import { publishedRecipes, seedRecipe } from './fixtures.ts'
+import { disableAutoLoad, pagingName, pagingRecipes, range } from './paging.ts'
 
 // The /recipes list: search, filters, sort and paging, all held in the URL.
 // Every test starts from exactly the seed fixtures; the paging tests add more.
@@ -36,7 +37,10 @@ const filtersButton = (page: Page, count: number) =>
 
 // The disclosure's "Clear all" is a button; the empty state's is a link.
 const clearAllButton = (page: Page) => page.getByRole('button', { name: 'Clear all', exact: true })
-const moreRecipes = (page: Page) => page.getByRole('link', { name: 'More recipes', exact: true })
+// "More recipes" is a link in the server's HTML and a button once hydrated.
+const moreRecipesLink = (page: Page) => page.getByRole('link', { name: 'More recipes', exact: true })
+const moreRecipesButton = (page: Page) => page.getByRole('button', { name: 'More recipes', exact: true })
+const moreRecipes = (page: Page) => moreRecipesLink(page).or(moreRecipesButton(page))
 
 // The sort button shows the current sort, e.g. "Sort: Newest".
 async function sortBy(page: Page, option: 'Newest' | 'Oldest') {
@@ -438,93 +442,63 @@ test.describe('recipe search', () => {
   })
 })
 
+// The server renders the first page; with JavaScript, "More recipes" is a
+// button that appends the next page in place, leaving the URL alone. More in
+// infinite-scroll.spec.ts.
 test.describe('recipe list paging', () => {
-  // RECIPE_PAGE_SIZE + 3 quick recipes tagged "paging", all published at the
-  // same instant (before every seed recipe), so pages split inside a tie on
-  // publishedAt and the order within it comes from _id alone.
   const PAGING_COUNT = RECIPE_PAGE_SIZE + 3
-  const pagingName = (n: number) => `E2E Paging ${String(n).padStart(2, '0')}`
-  const range = (from: number, to: number) => {
-    const step = from <= to ? 1 : -1
-    return Array.from({ length: Math.abs(to - from) + 1 }, (_, i) => from + i * step)
-  }
+  // Newest first: the seeds, then the paging recipes by _id descending.
+  const firstPagePaging = RECIPE_PAGE_SIZE - newestFirst.length
+  const firstPage = [...newestFirst, ...range(PAGING_COUNT, PAGING_COUNT - firstPagePaging + 1).map(pagingName)]
+  const secondPage = range(PAGING_COUNT - firstPagePaging, 1).map(pagingName)
 
-  function pagingRecipes(): SeedRecipe[] {
-    const template = seedRecipe('E2E Chicken Tacos')
-    return range(1, PAGING_COUNT).map((n) => ({
-      ...template,
-      _id: `65b${n.toString(16).padStart(21, '0')}`,
-      name: pagingName(n),
-      slug: `e2e-paging-${n}`,
-      imagePublicId: `recipes/e2e-paging-${n}`,
-      tags: ['paging'],
-      prepTime: 10,
-      cookTime: 10,
-      publishedAt: new Date('2023-06-01T12:00:00Z'),
-      createdAt: new Date('2023-06-01T12:00:00Z'),
-    }))
-  }
+  test.beforeEach(async ({ page }) => {
+    await insertRecipes(pagingRecipes(PAGING_COUNT))
+    await disableAutoLoad(page)
+  })
 
-  test('"More recipes" shows the next page, and the last page has no link', async ({ page }) => {
-    await insertRecipes(pagingRecipes())
-    // Newest first: the seeds, then the paging recipes by _id descending.
-    const firstPagePaging = RECIPE_PAGE_SIZE - newestFirst.length
-    const firstPage = [...newestFirst, ...range(PAGING_COUNT, PAGING_COUNT - firstPagePaging + 1).map(pagingName)]
-    const secondPage = range(PAGING_COUNT - firstPagePaging, 1).map(pagingName)
-
+  test('"More recipes" appends the next page without changing the URL, and the last page has no control', async ({
+    page,
+  }) => {
     await page.goto('/recipes')
     await expect(recipeGridNames(page)).toHaveText(firstPage)
 
-    await moreRecipes(page).click()
-    await expect(page).toHaveURL(listingUrl({ after: true }))
-    await expect(recipeGridNames(page)).toHaveText(secondPage)
-    await expect(moreRecipes(page)).toHaveCount(0)
+    await moreRecipesButton(page).click()
 
-    // The page is in the URL.
-    await page.reload()
-    await expect(recipeGridNames(page)).toHaveText(secondPage)
-    await expect(moreRecipes(page)).toHaveCount(0)
-
-    await page.goBack()
+    await expect(recipeGridNames(page)).toHaveText([...firstPage, ...secondPage])
     await expect(page).toHaveURL(listingUrl())
-    await expect(recipeGridNames(page)).toHaveText(firstPage)
-    await expect(moreRecipes(page)).toBeVisible()
+    await expect(moreRecipes(page)).toHaveCount(0)
   })
 
   test('"More recipes" keeps the filters and sort', async ({ page }) => {
-    await insertRecipes(pagingRecipes())
-
     await page.goto('/recipes?tag=paging&time=quick&sort=oldest')
     await expect(recipeGridNames(page)).toHaveText(range(1, RECIPE_PAGE_SIZE).map(pagingName))
 
-    await moreRecipes(page).click()
+    await moreRecipesButton(page).click()
 
-    await expect(page).toHaveURL(listingUrl({ tag: 'paging', time: 'quick', sort: 'oldest', after: true }))
-    await expect(recipeGridNames(page)).toHaveText(range(RECIPE_PAGE_SIZE + 1, PAGING_COUNT).map(pagingName))
+    await expect(recipeGridNames(page)).toHaveText(range(1, PAGING_COUNT).map(pagingName))
+    await expect(page).toHaveURL(listingUrl({ tag: 'paging', time: 'quick', sort: 'oldest' }))
     await expect(moreRecipes(page)).toHaveCount(0)
   })
 
-  test('"More recipes" keeps the search, and a new search drops the cursor', async ({ page }) => {
-    await insertRecipes(pagingRecipes())
-
+  test('"More recipes" keeps the search, and a new search starts again at its first page', async ({ page }) => {
     await page.goto('/recipes?q=e2e+paging')
     await expect(recipeGridNames(page)).toHaveText(range(PAGING_COUNT, PAGING_COUNT - RECIPE_PAGE_SIZE + 1).map(pagingName))
 
-    await moreRecipes(page).click()
-    await expect(page).toHaveURL(listingUrl({ q: 'e2e paging', after: true }))
-    await expect(recipeGridNames(page)).toHaveText(range(PAGING_COUNT - RECIPE_PAGE_SIZE, 1).map(pagingName))
+    await moreRecipesButton(page).click()
+    await expect(recipeGridNames(page)).toHaveText(range(PAGING_COUNT, 1).map(pagingName))
+    await expect(page).toHaveURL(listingUrl({ q: 'e2e paging' }))
 
     await searchFor(page, 'paging')
     await expect(page).toHaveURL(listingUrl({ q: 'paging' }))
-    await expect(recipeGridNames(page)).toHaveCount(RECIPE_PAGE_SIZE)
+    await expect(recipeGridNames(page)).toHaveText(range(PAGING_COUNT, PAGING_COUNT - RECIPE_PAGE_SIZE + 1).map(pagingName))
+    await expect(moreRecipesButton(page)).toBeVisible()
   })
 
-  test('changing a filter or the sort drops the cursor', async ({ page }) => {
-    await insertRecipes(pagingRecipes())
-
+  test('changing a filter or the sort starts again at the first page', async ({ page }) => {
     await page.goto('/recipes')
-    await moreRecipes(page).click()
-    await expect(page).toHaveURL(listingUrl({ after: true }))
+    await moreRecipesButton(page).click()
+    await expect(recipeGridNames(page)).toHaveText([...firstPage, ...secondPage])
 
     await filtersButton(page, 0).click()
     await page.getByRole('radio', { name: 'Total Time: > 1 Hour' }).click()
@@ -532,11 +506,37 @@ test.describe('recipe list paging', () => {
     await expect(recipeGridNames(page)).toHaveText(['E2E Chicken Curry', 'E2E Beef Stew'])
 
     await page.goto('/recipes')
-    await moreRecipes(page).click()
-    await expect(page).toHaveURL(listingUrl({ after: true }))
+    await moreRecipesButton(page).click()
+    await expect(recipeGridNames(page)).toHaveText([...firstPage, ...secondPage])
 
+    // Oldest first: the paging recipes by _id ascending, then the seeds.
     await sortBy(page, 'Oldest')
     await expect(page).toHaveURL(listingUrl({ sort: 'oldest' }))
-    await expect(recipeGridNames(page).first()).toHaveText(pagingName(1))
+    await expect(recipeGridNames(page)).toHaveText(range(1, RECIPE_PAGE_SIZE).map(pagingName))
+    await expect(moreRecipesButton(page)).toBeVisible()
+  })
+
+  // The results stream in through Suspense, which needs JavaScript to show
+  // them, so these read the server's HTML, hidden content included.
+  test.describe('without JavaScript', () => {
+    test.use({ javaScriptEnabled: false })
+
+    const hiddenGridNames = (page: Page) =>
+      page
+        .getByRole('region', { name: 'Recipes', exact: true, includeHidden: true })
+        .getByRole('heading', { level: 3, includeHidden: true })
+
+    test('"More recipes" is a link to the next page, keeping the filters and sort', async ({ page }) => {
+      await page.goto('/recipes?tag=paging&time=quick&sort=oldest')
+      await expect(page.getByRole('button', { name: 'More recipes', exact: true, includeHidden: true })).toHaveCount(0)
+
+      const href = await page.getByRole('link', { name: 'More recipes', exact: true, includeHidden: true }).getAttribute('href')
+      const next = new URL(href!, page.url())
+      expect(listingUrl({ tag: 'paging', time: 'quick', sort: 'oldest', after: true })(next), href!).toBe(true)
+
+      await page.goto(href!)
+      await expect(hiddenGridNames(page)).toHaveText(range(RECIPE_PAGE_SIZE + 1, PAGING_COUNT).map(pagingName))
+      await expect(page.getByRole('link', { name: 'More recipes', exact: true, includeHidden: true })).toHaveCount(0)
+    })
   })
 })

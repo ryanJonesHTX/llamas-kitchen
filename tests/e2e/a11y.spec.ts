@@ -1,10 +1,12 @@
 import AxeBuilder from '@axe-core/playwright'
 import type { BrowserContext, Page } from '@playwright/test'
+import { RECIPE_PAGE_SIZE } from '../../lib/constants.ts'
 import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { deleteAllRecipes, disconnect, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
 import { addTags, saveButton, tagInput } from './recipeForm.ts'
+import { disableAutoLoad, pagingRecipes } from './paging.ts'
 
 // axe-core over every page and state, in both themes. Serious and critical
 // violations fail the test; the message lists each rule and its targets.
@@ -74,6 +76,27 @@ const scenarios: Scenario[] = [
     open: async (page) => {
       await page.goto('/recipes?q=zucchini')
       await expect(page.getByText('No recipes match this search.')).toBeVisible()
+    },
+  },
+  {
+    name: 'recipe list with a second page appended',
+    open: async (page) => {
+      await insertRecipes(pagingRecipes(RECIPE_PAGE_SIZE + 3))
+      await disableAutoLoad(page)
+      await page.goto('/recipes')
+      await page.getByRole('button', { name: 'More recipes', exact: true }).click()
+      await expect(page.getByText("That's every recipe.", { exact: true })).toBeVisible()
+    },
+  },
+  {
+    name: 'recipe list after a page failed to load',
+    open: async (page) => {
+      await insertRecipes(pagingRecipes(RECIPE_PAGE_SIZE + 3))
+      await page.route('**/api/recipes**', (route) => route.fulfill({ status: 500, body: 'Internal Server Error' }))
+      await disableAutoLoad(page)
+      await page.goto('/recipes')
+      await page.getByRole('button', { name: 'More recipes', exact: true }).click()
+      await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
     },
   },
   {

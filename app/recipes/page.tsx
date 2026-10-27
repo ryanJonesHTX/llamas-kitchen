@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import { FunnelIcon } from '@heroicons/react/24/outline'
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid'
-import RecipeCard from '../../components/RecipeCard'
 import RecipeFilters from '../../components/RecipeFilters'
+import RecipeGrid from '../../components/RecipeGrid'
 import RecipeGridSkeleton from '../../components/RecipeGridSkeleton'
 import { MAX_SEARCH_QUERY_LENGTH } from '../../lib/constants'
 import { toCardData } from '../../lib/recipes/card'
@@ -88,13 +88,15 @@ function emptyMessage({ q, tags, time }: ListingQuery): string {
   return filtered ? 'No recipes match this search and these filters.' : 'No recipes match this search.'
 }
 
-// The filters, grid and pagination: everything that reads the database.
+// The filters and the grid's first page: everything that reads the database.
 async function RecipeResults({ query }: { query: ListingQuery }) {
   const [{ recipes, nextCursor }, tagsInUse] = await Promise.all([listPublished(query), publishedTagsInUse()])
+  const cards = recipes.map(toCardData)
+  const state = { tags: query.tags, time: query.time, sort: query.sort, q: query.q }
 
   return (
     <>
-      <RecipeFilters state={{ tags: query.tags, time: query.time, sort: query.sort, q: query.q }} tagsInUse={tagsInUse} />
+      <RecipeFilters state={state} tagsInUse={tagsInUse} />
 
       <section aria-labelledby="recipes-heading" className="mt-8">
         <h2 id="recipes-heading" className="sr-only">
@@ -111,7 +113,7 @@ async function RecipeResults({ query }: { query: ListingQuery }) {
             </Link>
           </div>
         )}
-        {recipes.length === 0 ? (
+        {cards.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
             <FunnelIcon className="mx-auto h-10 w-10 text-muted" aria-hidden="true" />
             <p className="mt-4 text-base text-muted">{emptyMessage(query)}</p>
@@ -120,24 +122,14 @@ async function RecipeResults({ query }: { query: ListingQuery }) {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {recipes.map(toCardData).map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
-            ))}
-          </div>
+          // Keyed by the listing and the card it starts at, so a new URL starts again from its own page.
+          <RecipeGrid
+            key={`${listingHref(query)}#${cards[0].id}`}
+            state={state}
+            firstPage={{ recipes: cards, nextCursor }}
+          />
         )}
       </section>
-
-      {nextCursor && (
-        <nav aria-label="Pagination" className="mt-12 flex justify-center">
-          <Link
-            href={listingHref(query, nextCursor)}
-            className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface px-5 text-base font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft"
-          >
-            More recipes
-          </Link>
-        </nav>
-      )}
     </>
   )
 }
