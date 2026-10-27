@@ -90,5 +90,8 @@ test('a flash cookie with an unknown key shows nothing and is cleared', async ({
 
   await expect.poll(() => flashCookie(context)).toBeUndefined()
   await expect(page.getByRole('button', { name: 'Dismiss', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('status').filter({ hasText: /\S/ })).toHaveCount(0)
+  // The Toaster's status is attached but empty; it's the page's only status outside <main>.
+  const toasterStatus = page.getByRole('status').and(page.locator(':not(main *)'))
+  await expect(toasterStatus).toHaveCount(1)
+  await expect(toasterStatus).toHaveText('')
 })

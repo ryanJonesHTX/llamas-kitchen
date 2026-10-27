@@ -55,3 +55,6 @@ export const SEARCH_RESULT_LIMIT = 8
 // /api/recipes requests per client IP per window: the /recipes grid's next pages.
 export const LISTING_RATE_LIMIT = 120
 export const LISTING_RATE_WINDOW_MS = 60 * 1000
+
+// The most servings the recipe page's stepper scales to, unless the recipe itself serves more.
+export const MAX_SCALED_SERVINGS = 100

@@ -5,10 +5,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowTopRightOnSquareIcon, ClockIcon, FireIcon, ScissorsIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { auth } from '../../../auth'
-import IngredientChecklist from '../../../components/IngredientChecklist'
 import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
+import ServingsIngredients from '../../../components/ServingsIngredients'
 import { formatMinutes } from '../../../lib/recipes/duration'
-import { formatIngredient } from '../../../lib/recipes/format'
 import { recipeImageUrl } from '../../../lib/recipes/image'
 import { listingHref } from '../../../lib/recipes/listingHref'
 import { canEdit, canView } from '../../../lib/recipes/permissions'
@@ -108,16 +107,16 @@ export default async function RecipePage({ params }: Props) {
           aria-labelledby="ingredients-heading"
           className="self-start rounded-xl border border-border bg-surface p-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto print:static print:max-h-none print:break-inside-avoid print:overflow-visible print:bg-transparent print:p-0 print:border-0"
         >
-          {/* Servings scaling (5.4) goes in this row, beside the servings note. */}
-          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 id="ingredients-heading" className={SECTION_HEADING}>
-              Ingredients
-            </h2>
-            <p className="text-sm text-muted">
-              for {recipe.servings} {recipe.servings === 1 ? 'serving' : 'servings'}
-            </p>
-          </div>
-          <IngredientChecklist lines={recipe.ingredients.map(formatIngredient)} labelledBy="ingredients-heading" />
+          <ServingsIngredients
+            heading={
+              <h2 id="ingredients-heading" className={SECTION_HEADING}>
+                Ingredients
+              </h2>
+            }
+            headingId="ingredients-heading"
+            ingredients={recipe.ingredients.map(({ quantity, unit, item }) => ({ quantity, unit, item }))}
+            servings={recipe.servings}
+          />
         </section>
 
         <div className="lg:col-span-2 print:mt-8">

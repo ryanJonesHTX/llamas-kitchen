@@ -7,6 +7,7 @@ import { deleteAllRecipes, disconnect, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
 import { addTags, saveButton, tagInput } from './recipeForm.ts'
 import { disableAutoLoad, pagingRecipes } from './paging.ts'
+import { openRecipe } from './recipePage.ts'
 
 // axe-core over every page and state, in both themes. Serious and critical
 // violations fail the test; the message lists each rule and its targets.
@@ -103,6 +104,14 @@ const scenarios: Scenario[] = [
     name: 'recipe page',
     open: async (page) => {
       await page.goto(`/recipes/${stew.slug}`)
+    },
+  },
+  {
+    name: 'recipe page with the servings changed and Reset showing',
+    open: async (page) => {
+      await openRecipe(page, stew.slug)
+      await page.getByRole('button', { name: 'Increase servings', exact: true }).click()
+      await expect(page.getByRole('button', { name: 'Reset servings', exact: true })).toBeVisible()
     },
   },
   {

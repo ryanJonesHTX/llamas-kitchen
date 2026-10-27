@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { expect } from './test.ts'
 
 // The public recipe page (app/recipes/[slug]/page.tsx). Each list is named by
 // its heading (aria-labelledby) or aria-label.
@@ -20,3 +21,14 @@ export const tagItems = (page: Page) => tagLinks(page).locator('span:not(.sr-onl
 export const factTerms = (page: Page) => page.getByRole('term')
 
 export const factValues = (page: Page) => page.getByRole('definition')
+
+// Opens a recipe and waits until React has attached its handlers to the
+// servings stepper, so a press is never lost to a not-yet-hydrated button.
+export async function openRecipe(page: Page, slug: string) {
+  const increase = page.getByRole('button', { name: 'Increase servings', exact: true })
+  await page.goto(`/recipes/${slug}`)
+  await expect(increase).toBeVisible()
+  await expect
+    .poll(() => increase.evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))))
+    .toBe(true)
+}
