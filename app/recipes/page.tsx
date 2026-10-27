@@ -8,6 +8,7 @@ import RecipeCard from '../../components/RecipeCard'
 import RecipeFilters from '../../components/RecipeFilters'
 import RecipeGridSkeleton from '../../components/RecipeGridSkeleton'
 import { MAX_SEARCH_QUERY_LENGTH } from '../../lib/constants'
+import { toCardData } from '../../lib/recipes/card'
 import {
   listPublished,
   parseListingParams,
@@ -120,8 +121,8 @@ async function RecipeResults({ query }: { query: ListingQuery }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {recipes.map((recipe) => (
-              <RecipeCard key={String(recipe._id)} recipe={recipe} />
+            {recipes.map(toCardData).map((recipe) => (
+              <RecipeCard key={recipe.id} recipe={recipe} />
             ))}
           </div>
         )}

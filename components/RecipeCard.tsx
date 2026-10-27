@@ -2,23 +2,22 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { CakeIcon, ClockIcon } from '@heroicons/react/24/outline'
 import { formatMinutes } from '../lib/recipes/duration'
-import { recipeImageUrl } from '../lib/recipes/image'
-import type { RecipeCardRecord } from '../lib/recipes/listing'
+import type { RecipeCardData } from '../lib/recipes/card'
 
 const MAX_TAGS = 3
 
-// One recipe in a card grid (/recipes and the home page). Server-only: recipeImageUrl reads the environment.
+// One recipe in a card grid (/recipes and the home page). Renders from plain data, so client components can use it too.
 // The title link's overlay span makes the whole card one link, named by the recipe.
-export default function RecipeCard({ recipe }: { recipe: RecipeCardRecord }) {
+export default function RecipeCard({ recipe }: { recipe: RecipeCardData }) {
   const shownTags = recipe.tags.slice(0, MAX_TAGS)
   const hiddenTagCount = recipe.tags.length - shownTags.length
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface motion-safe:transition-shadow hover:border-border-strong hover:shadow-md has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus">
       <div className="relative aspect-4/3 bg-accent-soft">
-        {recipe.imagePublicId ? (
+        {recipe.imageUrl ? (
           <Image
-            src={recipeImageUrl(recipe.imagePublicId, 'card')}
+            src={recipe.imageUrl}
             alt=""
             fill
             sizes="(min-width: 1280px) 300px, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"

@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { auth } from '../auth'
 import RecipeCard from '../components/RecipeCard'
-import type { RecipeCardRecord } from '../lib/recipes/listing'
+import { toCardData, type RecipeCardData } from '../lib/recipes/card'
 import { latestPublished } from '../lib/recipes/queries'
 
 const heroImage = '/images/llama.webp'
@@ -13,7 +13,7 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <Hero signedIn={signedIn} />
-      <LatestRecipes recipes={recipes} signedIn={signedIn} />
+      <LatestRecipes recipes={recipes.map(toCardData)} signedIn={signedIn} />
     </div>
   )
 }
@@ -64,7 +64,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
 }
 
 // `recipes` arrive newest first, already limited to the latest few.
-function LatestRecipes({ recipes, signedIn }: { recipes: RecipeCardRecord[]; signedIn: boolean }) {
+function LatestRecipes({ recipes, signedIn }: { recipes: RecipeCardData[]; signedIn: boolean }) {
   return (
     <section aria-labelledby="latest-heading" className="border-t border-border pt-12 sm:pt-16">
       <div className="flex items-baseline justify-between gap-x-4">
@@ -91,7 +91,7 @@ function LatestRecipes({ recipes, signedIn }: { recipes: RecipeCardRecord[]; sig
       ) : (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {recipes.map((recipe) => (
-            <RecipeCard key={String(recipe._id)} recipe={recipe} />
+            <RecipeCard key={recipe.id} recipe={recipe} />
           ))}
         </div>
       )}

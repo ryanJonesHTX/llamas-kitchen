@@ -1,6 +1,6 @@
 // In-memory limits for magic-link sign-in emails; createRateLimiter also
 // limits image uploads (app/recipes/actions.ts) and, with clientIp, searches
-// (app/api/search/route.ts). Production runs a single
+// (app/api/search/route.ts) and listing pages (app/api/recipes/route.ts). Production runs a single
 // `next start` process, so per-process state is the whole picture.
 // Server-only: node:net keeps it out of client bundles.
 import { isIP } from 'node:net'
