@@ -215,6 +215,20 @@ const scenarios: Scenario[] = [
     },
   },
   {
+    name: "admin's edit form with the delete dialog open",
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await page.goto(`/recipes/${stew.slug}/edit`)
+      const deleteButton = page.getByRole('button', { name: 'Delete recipe', exact: true })
+      await expect(deleteButton).toBeVisible()
+      await expect
+        .poll(() => deleteButton.evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))))
+        .toBe(true)
+      await deleteButton.click()
+      await expect(page.getByRole('dialog', { name: `Delete ${stew.name}?` })).toBeVisible()
+    },
+  },
+  {
     name: "owner's edit form for a rejected recipe, with the rejection reason",
     open: async (page, context) => {
       await signInAs(context, { id: SEED_SUBMITTER_ID, email: 'submitter@example.com', role: 'user' })
@@ -312,7 +326,8 @@ for (const theme of ['light', 'dark'] as const) {
         // Reduced motion: axe checks the settled state, not a toast or menu mid-fade.
         await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
         await open(page, context)
-        await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+        // includeHidden: a modal opened from <main> hides the h1 from the accessibility tree.
+        await expect(page.getByRole('heading', { level: 1, includeHidden: true })).toBeVisible()
 
         const { violations } = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze()
         const failing = violations.filter((violation) => FAILING_IMPACTS.includes(violation.impact ?? ''))

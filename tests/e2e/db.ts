@@ -23,7 +23,7 @@ export async function connect() {
 
 // Replaces every recipe with the seed fixtures, builds the recipe indexes (as
 // scripts/sync-indexes.ts does, so the unique slug index exists), signs
-// everyone out and clears the fake Cloudinary's upload log.
+// everyone out and clears the fake Cloudinary's upload and destroy logs.
 export async function reseed() {
   const connection = await connect()
   await Recipe.deleteMany({})

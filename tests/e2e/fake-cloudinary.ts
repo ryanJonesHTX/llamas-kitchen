@@ -5,15 +5,22 @@
 // fetch when it patches it, so wrapping it before Next loads puts this fake
 // underneath Next's fetch.
 //
-// Only POSTs to the e2e upload URL are answered here; every other fetch goes
-// to the real fetch. Each answered upload is appended to the log file as one
-// JSON line, so tests can read what was uploaded (see uploads.ts).
+// Only POSTs to the e2e upload and destroy URLs are answered here; any other
+// api.cloudinary.com request throws, and every other fetch goes to the real
+// fetch. Each answered upload or destroy is appended to its log file as one
+// JSON line, so tests can read what was sent (see uploads.ts).
 //
 // A file whose name contains "slow" is held until the test calls
 // releaseSlowUpload(), so a test can look at the form mid-upload.
 import { appendFileSync, existsSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
-import { CLOUDINARY_UPLOAD_URL, FAKE_CLOUDINARY_LOG, SLOW_UPLOAD_RELEASE } from './uploads.ts'
+import {
+  CLOUDINARY_DESTROY_URL,
+  CLOUDINARY_UPLOAD_URL,
+  FAKE_CLOUDINARY_DESTROY_LOG,
+  FAKE_CLOUDINARY_LOG,
+  SLOW_UPLOAD_RELEASE,
+} from './uploads.ts'
 
 export type FakeUpload = {
   // Every string field of the multipart body.
@@ -24,9 +31,27 @@ export type FakeUpload = {
 
 const realFetch = globalThis.fetch
 
+const CLOUDINARY_API_HOST = 'api.cloudinary.com'
+
+// Every string field of a multipart body.
+function stringFields(form: FormData): Record<string, string> {
+  const fields: Record<string, string> = {}
+  for (const [name, value] of form) {
+    if (typeof value === 'string') fields[name] = value
+  }
+  return fields
+}
+
 globalThis.fetch = async function fakeCloudinaryFetch(input, init) {
   const request = new Request(input, init)
+  if (request.method === 'POST' && request.url === CLOUDINARY_DESTROY_URL) {
+    appendFileSync(FAKE_CLOUDINARY_DESTROY_LOG, `${JSON.stringify(stringFields(await request.formData()))}\n`)
+    return Response.json({ result: 'ok' })
+  }
   if (request.method !== 'POST' || request.url !== CLOUDINARY_UPLOAD_URL) {
+    if (new URL(request.url).hostname === CLOUDINARY_API_HOST) {
+      throw new Error(`fake Cloudinary: unexpected request ${request.method} ${request.url}`)
+    }
     // The Request, not (input, init): building it took ownership of any body.
     return realFetch(request)
   }
@@ -34,10 +59,7 @@ globalThis.fetch = async function fakeCloudinaryFetch(input, init) {
   const form = await request.formData()
   const file = form.get('file')
   if (!(file instanceof File)) throw new Error('fake Cloudinary: the upload has no file')
-  const fields: Record<string, string> = {}
-  for (const [name, value] of form) {
-    if (typeof value === 'string') fields[name] = value
-  }
+  const fields = stringFields(form)
   // Deterministic: "lasagna.png" uploads as "recipes/lasagna".
   const publicId = `recipes/${file.name.replace(/\.[^.]*$/, '')}`
   const upload: FakeUpload = {

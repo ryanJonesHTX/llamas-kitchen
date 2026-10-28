@@ -2,6 +2,7 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { auth } from '../../../../auth'
+import DeleteRecipe from '../../../../components/DeleteRecipe'
 import RecipeForm, { type RecipeFormValues } from '../../../../components/RecipeForm'
 import { requireUserPage } from '../../../../lib/guards'
 import { formatIngredient } from '../../../../lib/recipes/format'
@@ -49,15 +50,20 @@ export default async function EditRecipePage({ params }: Props) {
   // The same 404 for a missing recipe and one this user may not edit.
   if (!recipe || !canEdit(session, recipe)) notFound()
 
+  const admin = isAdmin(session)
+  const recipeId = recipe._id.toHexString()
   return (
-    <RecipeForm
-      admin={isAdmin(session)}
-      recipeId={recipe._id.toHexString()}
-      status={recipe.status}
-      rejectionReason={recipe.rejectionReason}
-      initialValues={formValues(recipe)}
-      imageUrlPrefix={recipeImageUrlPrefix('card')}
-      tagSuggestions={await publishedTagsInUse()}
-    />
+    <>
+      <RecipeForm
+        admin={admin}
+        recipeId={recipeId}
+        status={recipe.status}
+        rejectionReason={recipe.rejectionReason}
+        initialValues={formValues(recipe)}
+        imageUrlPrefix={recipeImageUrlPrefix('card')}
+        tagSuggestions={await publishedTagsInUse()}
+      />
+      {admin && <DeleteRecipe recipeId={recipeId} name={recipe.name} />}
+    </>
   )
 }

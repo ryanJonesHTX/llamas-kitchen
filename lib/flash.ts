@@ -14,6 +14,7 @@ const FLASH_MESSAGES = {
   submitted: 'Recipe submitted for review',
   approved: 'Recipe approved',
   rejected: 'Recipe rejected',
+  deleted: 'Recipe deleted',
   linkCopied: 'Link copied',
   copyFailed: "Couldn't copy the link",
 } as const

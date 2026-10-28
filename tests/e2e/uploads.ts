@@ -7,6 +7,7 @@ import type { FakeUpload } from './fake-cloudinary.ts'
 // The fake cloud name tests/e2e/server.ts gives `next start`.
 export const E2E_CLOUD_NAME = 'e2e-cloud'
 export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${E2E_CLOUD_NAME}/image/upload`
+export const CLOUDINARY_DESTROY_URL = `https://api.cloudinary.com/v1_1/${E2E_CLOUD_NAME}/image/destroy`
 
 // Where tests/e2e/fake-cloudinary.ts records the uploads it answers. Shared by
 // the server process and the test workers, so it lives in a fixed place.
@@ -21,6 +22,19 @@ export function cloudinaryUploads(): FakeUpload[] {
     .map((line) => JSON.parse(line) as FakeUpload)
 }
 
+// Where the fake records the destroy requests it answers.
+export const FAKE_CLOUDINARY_DESTROY_LOG = join(tmpdir(), 'llamas-kitchen-e2e-cloudinary-destroy.jsonl')
+
+// The string fields of every destroy request the fake has answered since the
+// last reset, oldest first.
+export function cloudinaryDestroys(): Record<string, string>[] {
+  if (!existsSync(FAKE_CLOUDINARY_DESTROY_LOG)) return []
+  return readFileSync(FAKE_CLOUDINARY_DESTROY_LOG, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, string>)
+}
+
 // While this file is missing, the fake holds uploads of files named "*slow*".
 export const SLOW_UPLOAD_RELEASE = `${FAKE_CLOUDINARY_LOG}.release`
 
@@ -30,6 +44,7 @@ export function releaseSlowUpload(): void {
 
 export function resetCloudinaryUploads(): void {
   rmSync(FAKE_CLOUDINARY_LOG, { force: true })
+  rmSync(FAKE_CLOUDINARY_DESTROY_LOG, { force: true })
   rmSync(SLOW_UPLOAD_RELEASE, { force: true })
 }
 

@@ -100,3 +100,13 @@ describe('the share flash keys', () => {
     expect(flashMessage(flashCookieValue(pair))).toBe(message)
   })
 })
+
+describe('the delete flash key', () => {
+  it('maps "deleted" to "Recipe deleted"', () => {
+    expect(flashMessage('deleted')).toBe('Recipe deleted')
+  })
+
+  it('gives "deleted" the success tone', () => {
+    expect(flashTone('deleted')).toBe('success')
+  })
+})
