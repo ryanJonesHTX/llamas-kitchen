@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowTopRightOnSquareIcon, ClockIcon, FireIcon, ScissorsIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { auth } from '../../../auth'
+import CookMode, { CookModeToggle } from '../../../components/CookMode'
 import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
 import ServingsIngredients from '../../../components/ServingsIngredients'
 import { formatMinutes } from '../../../lib/recipes/duration'
@@ -40,8 +41,10 @@ export default async function RecipePage({ params }: Props) {
     { label: 'Serves', value: String(recipe.servings), Icon: UsersIcon },
   ]
 
+  // Cook mode restyles the page through group-data-cook-mode/cook variants; not-print
+  // keeps them off paper, so a printout is the same either way.
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+    <CookMode className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
       <div className="py-10 sm:py-12 print:pt-0 print:pb-8">
         {recipe.status !== 'published' && (
           <RecipeStatusBanner status={recipe.status} rejectionReason={recipe.rejectionReason} className="mb-6" />
@@ -49,7 +52,7 @@ export default async function RecipePage({ params }: Props) {
         {/* Each tag links to the list filtered by it. Below lg, an ::after overlay makes
             the 20px chip a 44px target; gap-y-6 keeps stacked rows' targets apart. */}
         {recipe.tags.length > 0 && (
-          <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-x-1.5 gap-y-6 lg:gap-y-1.5 print:gap-x-3">
+          <ul role="list" aria-label="Tags" className="mb-4 flex flex-wrap gap-x-1.5 gap-y-6 lg:gap-y-1.5 print:gap-x-3 not-print:group-data-cook-mode/cook:hidden">
             {recipe.tags.map((tag) => (
               <li key={tag}>
                 <Link
@@ -68,28 +71,29 @@ export default async function RecipePage({ params }: Props) {
         </h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-muted">{recipe.description}</p>
 
-        {/* Facts on the left, actions on the right; cook mode (5.5) joins Edit in the actions row. */}
+        {/* Facts on the left, actions on the right. */}
         <div className="mt-8 flex flex-wrap items-end justify-between gap-6">
           <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:flex sm:gap-x-10">
             {facts.map(({ label, value, Icon }) => (
               <Fact key={label} label={label} value={value} Icon={Icon} />
             ))}
           </dl>
-          {canEdit(session, recipe) && (
-            <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
+            {canEdit(session, recipe) && (
               <Link
                 href={`/recipes/${recipe.slug}/edit`}
                 className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface px-4 text-sm font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft"
               >
                 Edit
               </Link>
-            </div>
-          )}
+            )}
+            <CookModeToggle />
+          </div>
         </div>
       </div>
 
       {recipe.imagePublicId && (
-        <div className="relative aspect-3/2 overflow-hidden rounded-2xl bg-accent-soft sm:aspect-2/1 lg:aspect-3/1 print:hidden">
+        <div className="relative aspect-3/2 overflow-hidden rounded-2xl bg-accent-soft sm:aspect-2/1 lg:aspect-3/1 print:hidden group-data-cook-mode/cook:hidden">
           <Image
             src={recipeImageUrl(recipe.imagePublicId, 'hero')}
             alt={recipe.name}
@@ -124,7 +128,7 @@ export default async function RecipePage({ params }: Props) {
             <h2 id="steps-heading" className={SECTION_HEADING}>
               Steps
             </h2>
-            <ol role="list" aria-labelledby="steps-heading" className="mt-6 max-w-2xl list-none space-y-8">
+            <ol role="list" aria-labelledby="steps-heading" className="mt-6 max-w-2xl list-none space-y-8 not-print:group-data-cook-mode/cook:space-y-10">
               {recipe.steps.map((step, index) => (
                 <li key={index} className="flex gap-x-4 print:break-inside-avoid">
                   <span
@@ -133,7 +137,9 @@ export default async function RecipePage({ params }: Props) {
                   >
                     {index + 1}
                   </span>
-                  <p className="min-w-0 whitespace-pre-line pt-1 text-lg leading-8 text-text">{step}</p>
+                  <p className="min-w-0 whitespace-pre-line pt-1 text-lg leading-8 text-text not-print:group-data-cook-mode/cook:text-2xl not-print:group-data-cook-mode/cook:leading-10">
+                    {step}
+                  </p>
                 </li>
               ))}
             </ol>
@@ -169,7 +175,7 @@ export default async function RecipePage({ params }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </CookMode>
   )
 }
 

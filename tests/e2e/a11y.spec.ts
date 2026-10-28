@@ -8,6 +8,7 @@ import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './
 import { addTags, fillSteps, saveButton, stepField, tagInput } from './recipeForm.ts'
 import { disableAutoLoad, pagingRecipes } from './paging.ts'
 import { openRecipe } from './recipePage.ts'
+import { fakeWakeLock } from './wakeLock.ts'
 
 // axe-core over every page and state, in both themes. Serious and critical
 // violations fail the test; the message lists each rule and its targets.
@@ -112,6 +113,22 @@ const scenarios: Scenario[] = [
       await openRecipe(page, stew.slug)
       await page.getByRole('button', { name: 'Increase servings', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Reset servings', exact: true })).toBeVisible()
+    },
+  },
+  {
+    name: 'recipe page in cook mode with the screen-sleep note',
+    open: async (page) => {
+      // Refused, so the note is on screen for axe to check too.
+      await fakeWakeLock(page, 'reject')
+      await openRecipe(page, stew.slug)
+      const cookMode = page.getByRole('button', { name: 'Cook mode', exact: true })
+      await expect(cookMode).toBeVisible()
+      await expect
+        .poll(() => cookMode.evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))))
+        .toBe(true)
+      await cookMode.click()
+      await expect(cookMode).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByText('Your screen may still go to sleep.', { exact: true })).toBeVisible()
     },
   },
   {
