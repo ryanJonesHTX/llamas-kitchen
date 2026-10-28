@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import mongoose, { Types } from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
@@ -44,6 +45,7 @@ const cloudinaryEnv = {
   CLOUDINARY_API_SECRET: 'unit-api-secret-do-not-leak',
 }
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/unit-cloud/image/upload'
+const CLOUDINARY_DESTROY_URL = 'https://api.cloudinary.com/v1_1/unit-cloud/image/destroy'
 
 const sessionFor = (role: 'user' | 'admin', id: Types.ObjectId) => ({
   expires: '2999-01-01T00:00:00.000Z',
@@ -1172,5 +1174,215 @@ describe('the upload rate limit', () => {
     for (let n = 0; n <= UPLOAD_RATE_LIMIT + 5; n++) {
       expect(await upload()).toEqual({ ok: true, publicId: 'recipes/abc123' })
     }
+  })
+})
+
+// ---------------------------------------------------------------- delete
+
+describe('deleteRecipe', () => {
+  const now = new Date('2026-10-28T12:00:00.000Z')
+  const GONE: import('../../app/recipes/actions').DeleteResult = {
+    ok: false,
+    formError: 'This recipe no longer exists.',
+  }
+  const IMAGE = 'recipes/stew-photo'
+
+  // Cloudinary answers a destroy with { result }, 'ok' when it deleted the image.
+  const destroyAnswer = (result: string, status = 200) =>
+    new Response(JSON.stringify({ result }), { status, headers: { 'content-type': 'application/json' } })
+
+  // Cloudinary's signature, computed here independently of the app: the signed
+  // params sorted by name as name=value joined with &, the secret appended, SHA-1 hex.
+  const expectedSignature = (publicId: string, timestamp: string) =>
+    createHash('sha1')
+      .update(`invalidate=true&public_id=${publicId}&timestamp=${timestamp}${cloudinaryEnv.CLOUDINARY_API_SECRET}`)
+      .digest('hex')
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+    fetchMock.mockImplementation(async () => destroyAnswer('ok'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it.each([
+    ['no session', null],
+    ['a signed-in user who is not an admin', userSession],
+  ])('throws for %s, keeps the recipe and calls nothing', async (_label, session) => {
+    const id = await seed(pendingDoc({ submittedBy: userId, imagePublicId: IMAGE }))
+    auth.mockResolvedValue(session)
+    const before = await allRecipes()
+
+    await expect(actions.deleteRecipe(id.toHexString())).rejects.toThrow()
+    expect(await allRecipes()).toEqual(before)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('throws for a non-admin before checking the id', async () => {
+    auth.mockResolvedValue(userSession)
+    await expect(actions.deleteRecipe('not-an-id')).rejects.toThrow()
+  })
+
+  it.each([
+    ['published', () => recipeDoc()],
+    ['pending', () => pendingDoc({ submittedBy: userId })],
+    ['rejected', () => rejectedDoc({ submittedBy: userId })],
+  ])('deletes a %s recipe and returns { ok: true }', async (_label, doc) => {
+    const id = await seed(doc())
+    const other = await seed(recipeDoc({ name: 'Lamb Stew', slug: 'lamb-stew' }))
+
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+    expect(await stored({ _id: id })).toBeNull()
+    expect((await allRecipes()).map((recipe) => recipe._id)).toEqual([other])
+  })
+
+  it.each([
+    ['an unknown id', '65f000000000000000000000'],
+    ['a malformed id', 'not-an-id'],
+    // Typed as a string, but a client can post any serializable value.
+    ['an ObjectId-shaped object', { _bsontype: 'ObjectId' } as unknown as string],
+  ])('returns the no-longer-exists form error for %s, changes nothing and calls nothing', async (_label, id) => {
+    await seed(recipeDoc({ imagePublicId: IMAGE }))
+    const before = await allRecipes()
+
+    expect(await actions.deleteRecipe(id)).toEqual(GONE)
+    expect(await allRecipes()).toEqual(before)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('returns the no-longer-exists form error when deleting the same recipe twice', async () => {
+    const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+    fetchMock.mockClear()
+
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual(GONE)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not call Cloudinary for a recipe with no image', async () => {
+    const id = await seed(recipeDoc())
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("destroys the image of the recipe that was its only user, with a signed POST to Cloudinary's destroy endpoint", async () => {
+    const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+    await seed(recipeDoc({ name: 'Lamb Stew', slug: 'lamb-stew', imagePublicId: 'recipes/lamb-photo' }))
+
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+
+    const { url, method, form } = await sentRequest()
+    expect(url).toBe(CLOUDINARY_DESTROY_URL)
+    expect(method).toBe('POST')
+    expect([...form.keys()].sort()).toEqual(['api_key', 'invalidate', 'public_id', 'signature', 'timestamp'])
+    expect(form.get('public_id')).toBe(IMAGE)
+    expect(form.get('invalidate')).toBe('true')
+    expect(form.get('api_key')).toBe(cloudinaryEnv.CLOUDINARY_API_KEY)
+    const timestamp = String(Math.floor(now.getTime() / 1000))
+    expect(form.get('timestamp')).toBe(timestamp)
+    expect(form.get('signature')).toBe(expectedSignature(IMAGE, timestamp))
+    // The secret signs the request; it is never sent.
+    for (const value of form.values()) expect(value).not.toBe(cloudinaryEnv.CLOUDINARY_API_SECRET)
+  })
+
+  it('sends the destroy request with an abort signal, so a stalled request is cut off', async () => {
+    const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+    await actions.deleteRecipe(id.toHexString())
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('deletes the recipe before destroying its image', async () => {
+    const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+    let recipeAtDestroy: unknown = 'not called'
+    fetchMock.mockImplementation(async () => {
+      recipeAtDestroy = await stored({ _id: id })
+      return destroyAnswer('ok')
+    })
+
+    await actions.deleteRecipe(id.toHexString())
+    expect(recipeAtDestroy).toBeNull()
+  })
+
+  it.each([
+    ['published', () => recipeDoc({ name: 'Lamb Stew', slug: 'lamb-stew', imagePublicId: IMAGE })],
+    ['pending', () => pendingDoc({ name: 'Lamb Stew', slug: 'lamb-stew', imagePublicId: IMAGE })],
+  ])('keeps an image a %s recipe still uses, and leaves that recipe alone', async (_label, doc) => {
+    const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+    const sharerId = await seed(doc())
+    const sharer = await stored({ _id: sharerId })
+
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(await stored({ _id: id })).toBeNull()
+    expect(await stored({ _id: sharerId })).toEqual(sharer)
+  })
+
+  describe('when the destroy fails, the recipe stays deleted', () => {
+    // Each failure echoes the request's signature back, as Cloudinary's error
+    // messages can, so a log line that includes the body or error message shows.
+    const failures: [string, (signature: string) => Promise<Response>][] = [
+      ['Cloudinary answers 500', async (signature) => destroyAnswer(`Invalid Signature ${signature}`, 500)],
+      ["Cloudinary answers { result: 'error' }", async (signature) => destroyAnswer(`error ${signature}`)],
+      [
+        'the request times out',
+        async (signature) => {
+          throw new DOMException(`timed out ${signature}`, 'TimeoutError')
+        },
+      ],
+      [
+        'the network fails',
+        async (signature) => {
+          throw new TypeError(`fetch failed ${signature}`)
+        },
+      ],
+    ]
+
+    it.each(failures)('returns { ok: true } and logs an error without secrets when %s', async (_label, fail) => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      let signature = ''
+      fetchMock.mockImplementation(async (...args: Parameters<typeof fetch>) => {
+        signature = String((await new Request(...args).formData()).get('signature'))
+        return fail(signature)
+      })
+      const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+
+      expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+      expect(await stored({ _id: id })).toBeNull()
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/queue')
+      expect(signature).toMatch(/^[0-9a-f]{40}$/)
+      expect(consoleError).toHaveBeenCalled()
+      const logged = JSON.stringify(consoleError.mock.calls.map((args) => args.map(String)))
+      expect(logged).not.toContain(cloudinaryEnv.CLOUDINARY_API_SECRET)
+      expect(logged).not.toContain(signature)
+    })
+
+    it("returns { ok: true } and logs nothing when Cloudinary answers { result: 'not found' }", async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      fetchMock.mockImplementation(async () => destroyAnswer('not found'))
+      const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+
+      expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+      expect(await stored({ _id: id })).toBeNull()
+      expect(consoleError).not.toHaveBeenCalled()
+    })
+  })
+
+  it('logs nothing when the image is destroyed', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const id = await seed(recipeDoc({ imagePublicId: IMAGE }))
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+    expect(consoleError).not.toHaveBeenCalled()
+  })
+
+  it('revalidates the review queue after a delete', async () => {
+    const id = await seed(pendingDoc())
+    expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/queue')
   })
 })

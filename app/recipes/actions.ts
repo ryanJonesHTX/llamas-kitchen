@@ -44,12 +44,15 @@ export type UploadResult = { ok: true; publicId: string } | { ok: false; error: 
 
 export type ReviewResult = { ok: true } | { ok: false; fieldErrors: FieldErrors } | { ok: false; formError: string }
 
+export type DeleteResult = { ok: true } | { ok: false; formError: string }
+
 // An admin edit may also change the slug.
 const recipeUpdateSchema = recipeInputSchema.extend({
   slug: z.string().regex(SLUG_PATTERN, 'lowercase letters and numbers joined by single hyphens'),
 })
 
 const UPLOAD_TIMEOUT_MS = 30_000
+const DESTROY_TIMEOUT_MS = 10_000
 
 // Per non-admin user, in-process: production is a single `next start` process.
 const uploadLimiter = createRateLimiter({ limit: UPLOAD_RATE_LIMIT, windowMs: UPLOAD_RATE_WINDOW_MS })
@@ -236,6 +239,55 @@ export async function rejectRecipe(id: string, updatedAt: number, reason: string
   recipe.status = 'rejected'
   recipe.rejectionReason = parsed.data.reason
   return saveDecision(recipe)
+}
+
+// Deletes a recipe of any status, then its image in Cloudinary unless another
+// recipe still uses it. The same answer for a missing recipe and a malformed id.
+export async function deleteRecipe(id: string): Promise<DeleteResult> {
+  await requireAdminSession()
+  const gone: DeleteResult = { ok: false, formError: 'This recipe no longer exists.' }
+  // Typed as a string, but a client can send any value.
+  if (typeof id !== 'string' || !isObjectIdOrHexString(id)) return gone
+  await dbConnect()
+  const recipe = await Recipe.findOneAndDelete({ _id: id })
+  if (!recipe) return gone
+  const { imagePublicId } = recipe
+  if (imagePublicId && !(await Recipe.exists({ imagePublicId }))) await destroyRecipeImage(imagePublicId)
+  // Re-renders the queue in this action's response. Recipe pages and the list render per request.
+  revalidatePath('/admin/queue')
+  return { ok: true }
+}
+
+// Best effort, unlike uploadRecipeImage: the recipe is already gone, so any
+// failure only leaves an orphaned image and is logged, never thrown. Logs carry
+// no response body, result value or error message, since those can echo the
+// signature.
+async function destroyRecipeImage(publicId: string): Promise<void> {
+  const cloudName = requireEnv('CLOUDINARY_CLOUD_NAME')
+  const apiKey = requireEnv('CLOUDINARY_API_KEY')
+  const apiSecret = requireEnv('CLOUDINARY_API_SECRET')
+
+  const params = { public_id: publicId, timestamp: Math.floor(Date.now() / 1000), invalidate: 'true' }
+  const body = new FormData()
+  body.set('api_key', apiKey)
+  for (const [name, value] of Object.entries(params)) body.set(name, String(value))
+  body.set('signature', signUploadParams(params, apiSecret))
+
+  try {
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`, {
+      method: 'POST',
+      body,
+      signal: AbortSignal.timeout(DESTROY_TIMEOUT_MS),
+    })
+    if (!response.ok) {
+      console.error(`Cloudinary destroy failed with status ${response.status}`)
+      return
+    }
+    const { result } = (await response.json()) as { result: unknown }
+    if (result !== 'ok' && result !== 'not found') console.error('Cloudinary destroy did not delete the image')
+  } catch (error) {
+    console.error(`Cloudinary destroy failed: ${error instanceof Error ? error.name : 'unknown error'}`)
+  }
 }
 
 // Checks size and type (declared MIME type and magic bytes), then uploads to
