@@ -61,3 +61,7 @@ export const LISTING_RATE_WINDOW_MS = 60 * 1000
 
 // The most servings the recipe page's stepper scales to, unless the recipe itself serves more.
 export const MAX_SCALED_SERVINGS = 100
+
+// /recipes/[slug]/preview-image requests per client IP per window: each renders an image.
+export const PREVIEW_IMAGE_RATE_LIMIT = 30
+export const PREVIEW_IMAGE_RATE_WINDOW_MS = 60 * 1000
