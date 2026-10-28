@@ -18,7 +18,7 @@ import {
 import { listingHref } from '../../lib/recipes/listingHref'
 import { publishedTagsInUse } from '../../lib/recipes/queries'
 
-export const metadata: Metadata = { title: 'Llamas Kitchen - Recipes' }
+export const metadata: Metadata = { title: 'Recipes' }
 
 export default async function RecipesPage({ searchParams }: { searchParams: Promise<ListingSearchParams> }) {
   const query = parseListingParams(await searchParams)

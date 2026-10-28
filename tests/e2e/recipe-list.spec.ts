@@ -92,7 +92,7 @@ test.describe('recipe list', () => {
   test('shows every published recipe, newest first by default', async ({ page }) => {
     await page.goto('/recipes')
 
-    await expect(page).toHaveTitle('Llamas Kitchen - Recipes')
+    await expect(page).toHaveTitle("Recipes | Llama's Kitchen")
     await expect(recipeGridNames(page)).toHaveText(newestFirst)
     await expect(moreRecipes(page)).toHaveCount(0)
   })

@@ -1,4 +1,7 @@
+import { cache } from 'react'
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { auth } from '../../../../auth'
 import RecipeForm, { type RecipeFormValues } from '../../../../components/RecipeForm'
 import { requireUserPage } from '../../../../lib/guards'
 import { formatIngredient } from '../../../../lib/recipes/format'
@@ -27,10 +30,22 @@ function formValues(recipe: RecipeRecord): RecipeFormValues {
   }
 }
 
-export default async function EditRecipePage({ params }: { params: Promise<{ slug: string }> }) {
+type Props = { params: Promise<{ slug: string }> }
+
+// One database read per request, shared by generateMetadata and the page.
+const loadRecipe = cache(getRecipeBySlug)
+
+// The recipe's name only for a user who may edit it; anyone else gets the
+// same metadata as a missing recipe.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const [recipe, session] = await Promise.all([loadRecipe((await params).slug), auth()])
+  return recipe && canEdit(session, recipe) ? { title: `Edit ${recipe.name}` } : {}
+}
+
+export default async function EditRecipePage({ params }: Props) {
   const { slug } = await params
   const session = await requireUserPage(`/recipes/${slug}/edit`)
-  const recipe = await getRecipeBySlug(slug)
+  const recipe = await loadRecipe(slug)
   // The same 404 for a missing recipe and one this user may not edit.
   if (!recipe || !canEdit(session, recipe)) notFound()
 

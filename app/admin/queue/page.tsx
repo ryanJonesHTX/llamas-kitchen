@@ -4,7 +4,7 @@ import ReviewControls from '../../../components/ReviewControls'
 import { requireAdminPage } from '../../../lib/guards'
 import { queueEntries } from '../../../lib/recipes/queries'
 
-export const metadata: Metadata = { title: 'Llamas Kitchen - Review queue' }
+export const metadata: Metadata = { title: 'Review queue' }
 
 const submittedOn = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' })
 

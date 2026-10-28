@@ -8,6 +8,10 @@
 export const E2E_MONGODB_PORT = 27100
 export const E2E_MONGODB_DB = 'llamas-kitchen-e2e'
 
+// The app server's AUTH_URL (tests/e2e/server.ts): the origin absolute URLs
+// in the app's metadata (og:url, og:image) are built from.
+export const E2E_AUTH_URL = 'http://127.0.0.1:3100'
+
 // The admin who submitted every seed recipe. Never signed in by a test, so a
 // kept submittedBy can be told apart from one overwritten with the editor.
 export const SEED_ADMIN_ID = '64e000000000000000000001'
@@ -29,7 +33,8 @@ export type SeedRecipe = {
   prepTime: number
   cookTime: number
   tags: string[]
-  imagePublicId: string
+  // Optional, as in the model: a recipe without a photo has none.
+  imagePublicId?: string
   credit?: string
   notes?: string
   sourceUrl?: string

@@ -6,6 +6,7 @@ import { SessionProvider } from 'next-auth/react'
 import { auth } from '../auth'
 import SiteHeader from '../components/SiteHeader'
 import Toaster from '../components/Toaster'
+import { siteMetadata } from '../lib/metadata'
 import { parseTheme, THEME_COOKIE } from '../lib/theme'
 import '../styles/globals.css'
 
@@ -13,9 +14,9 @@ import '../styles/globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz'], variable: '--font-fraunces' })
 
-export const metadata: Metadata = {
-  title: 'Llamas Kitchen',
-  icons: { icon: '/images/favicon.ico' },
+// A function, so AUTH_URL is read per request rather than at build time.
+export function generateMetadata(): Metadata {
+  return siteMetadata()
 }
 
 // Seeding the provider from auth() means client components (SiteHeader,

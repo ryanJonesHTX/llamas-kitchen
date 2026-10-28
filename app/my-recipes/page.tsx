@@ -5,7 +5,7 @@ import type { RecipeStatus } from '../../lib/recipes/model'
 import { canEdit } from '../../lib/recipes/permissions'
 import { submittedRecipes } from '../../lib/recipes/queries'
 
-export const metadata: Metadata = { title: 'Llamas Kitchen - My recipes', robots: { index: false } }
+export const metadata: Metadata = { title: 'My recipes', robots: { index: false } }
 
 const submittedOn = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' })
 

@@ -130,9 +130,32 @@ test('an unknown slug responds 404', async ({ page }) => {
 
 // A hidden recipe's 404 must not reveal that the slug exists. Next streams
 // the RSC rows in a varying order, so the bodies can't be compared byte for
-// byte; what would give it away is robots metadata a missing slug lacks.
+// byte; what would give it away is metadata a missing slug lacks: robots, a
+// title or link-preview tags.
 test.describe('a hidden recipe, signed out', () => {
   const robotsMentions = (body: string) => body.split('robots').length - 1
+
+  // Every <meta> tag and the <title>, minus per-response attributes, sorted.
+  const metadataTags = (body: string) =>
+    (body.match(/<meta\b[^>]*>|<title\b[^>]*>[^<]*<\/title>/g) ?? [])
+      .map((tag) => tag.replace(/\s(?:nonce|id)="[^"]*"/g, ''))
+      .sort()
+
+  for (const hidden of hiddenRecipes) {
+    test(`a ${hidden.status} recipe's 404 has the same title and meta tags as a missing slug's`, async ({ request }) => {
+      const missing = 'e2e-no-such-recipe'
+      expect(seedRecipes.map((r) => r.slug)).not.toContain(missing)
+
+      const hiddenResponse = await request.get(`/recipes/${hidden.slug}`)
+      const missingResponse = await request.get(`/recipes/${missing}`)
+
+      expect(hiddenResponse.status()).toBe(404)
+      expect(missingResponse.status()).toBe(404)
+      const hiddenTags = metadataTags(await hiddenResponse.text())
+      expect(hiddenTags.some((tag) => tag.startsWith('<title'))).toBe(true)
+      expect(hiddenTags).toEqual(metadataTags(await missingResponse.text()))
+    })
+  }
 
   for (const hidden of hiddenRecipes) {
     test(`a ${hidden.status} recipe's 404 has the same robots metadata as a missing slug's`, async ({ request }) => {

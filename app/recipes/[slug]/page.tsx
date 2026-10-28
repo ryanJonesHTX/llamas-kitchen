@@ -9,6 +9,7 @@ import CookMode, { CookModeToggle } from '../../../components/CookMode'
 import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
 import ServingsIngredients from '../../../components/ServingsIngredients'
 import StepChecklist from '../../../components/StepChecklist'
+import { previewImage, SITE_NAME } from '../../../lib/metadata'
 import { formatMinutes } from '../../../lib/recipes/duration'
 import { recipeImageUrl } from '../../../lib/recipes/image'
 import { listingHref } from '../../../lib/recipes/listingHref'
@@ -22,11 +23,35 @@ type Props = { params: Promise<{ slug: string }> }
 // One database read per request, shared by generateMetadata and the page.
 const loadRecipe = cache(getRecipeBySlug)
 
+// A published recipe previews as an article, with its photo or else its
+// generated preview image. A hidden one gets a title and noindex, with no
+// preview, and only for a viewer who may see it, so a hidden recipe's 404
+// matches a missing slug's. With no openGraph there, Next fills og:title and
+// twitter:title from the page title. The session is read either way, so both
+// stream in the same order.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  // Only for a viewer who may see it, so a hidden recipe's 404 matches a missing
-  // slug's. The session is read either way, so both stream in the same order.
   const [recipe, session] = await Promise.all([loadRecipe((await params).slug), auth()])
-  return recipe && recipe.status !== 'published' && canView(session, recipe) ? { robots: { index: false } } : {}
+  if (!recipe || !canView(session, recipe)) return {}
+  if (recipe.status !== 'published') return { title: recipe.name, robots: { index: false } }
+
+  const url = `/recipes/${recipe.slug}`
+  const image = previewImage(
+    recipe.imagePublicId ? recipeImageUrl(recipe.imagePublicId, 'og') : `${url}/preview-image`,
+    recipe.name
+  )
+  return {
+    title: recipe.name,
+    description: recipe.description,
+    openGraph: {
+      type: 'article',
+      url,
+      title: recipe.name,
+      description: recipe.description,
+      siteName: SITE_NAME,
+      images: [image],
+    },
+    twitter: { card: 'summary_large_image', images: [image] },
+  }
 }
 
 export default async function RecipePage({ params }: Props) {
