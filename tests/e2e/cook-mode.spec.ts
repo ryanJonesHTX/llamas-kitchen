@@ -3,7 +3,7 @@ import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { disconnect, reseed } from './db.ts'
 import { seedRecipe } from './fixtures.ts'
-import { ingredientItems, openRecipe, stepTexts, tagLinks } from './recipePage.ts'
+import { ingredientItems, openRecipe, stepsList, stepTexts, tagLinks } from './recipePage.ts'
 import { fakeWakeLock, hideTab, showTab, wakeLockLog } from './wakeLock.ts'
 
 // Cook mode on the recipe page: a toggle in the actions row that keeps the
@@ -33,14 +33,19 @@ const servingsStatus = (page: Page) =>
 const fontSize = (locator: Locator) =>
   locator.evaluate((element) => parseFloat(getComputedStyle(element).fontSize))
 
-// Opens the stew and waits until both the servings stepper and the Cook mode
-// button are hydrated, so a press is never lost.
-async function openForCooking(page: Page) {
-  await openRecipe(page, stew.slug)
+// Waits until the Cook mode button is hydrated, so a press is never lost.
+async function waitForCookMode(page: Page) {
   await expect(cookMode(page)).toBeVisible()
   await expect
     .poll(() => cookMode(page).evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))))
     .toBe(true)
+}
+
+// Opens the stew and waits until both the servings stepper and the Cook mode
+// button are hydrated.
+async function openForCooking(page: Page) {
+  await openRecipe(page, stew.slug)
+  await waitForCookMode(page)
 }
 
 async function turnOn(page: Page) {
@@ -279,4 +284,171 @@ test('printing ignores cook mode: step text prints at the same size on or off', 
   await page.emulateMedia({ media: 'print' })
 
   expect(await fontSize(stepTexts(page).first())).toBe(printedOff)
+})
+
+// In cook mode each step becomes a checklist row: a checkbox named "Step N",
+// described by the step's text, ticked by clicking anywhere on the row.
+test.describe('the steps checklist', () => {
+  const stepBoxes = (page: Page) => stepsList(page).getByRole('checkbox')
+  const stepBox = (page: Page, number: number) => page.getByRole('checkbox', { name: `Step ${number}`, exact: true })
+  const ingredientBox = (page: Page) => page.getByRole('checkbox', { name: '2 lb stewing beef', exact: true })
+
+  const decorationLine = (locator: Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).textDecorationLine)
+
+  async function expectStruck(page: Page, index: number) {
+    await expect.poll(() => decorationLine(stepTexts(page).nth(index))).toContain('line-through')
+  }
+
+  async function expectNotStruck(page: Page, index: number) {
+    await expect.poll(() => decorationLine(stepTexts(page).nth(index))).not.toContain('line-through')
+  }
+
+  test('with cook mode off, steps are plain text: no checkboxes and no strike-through', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+
+    await expect(stepBoxes(page)).toHaveCount(0)
+    await expect(stepTexts(page)).toHaveText(stew.steps)
+    for (const index of stew.steps.keys()) await expectNotStruck(page, index)
+  })
+
+  test('with cook mode on, there is one checkbox per step, named "Step N" and described by its text', async ({
+    page,
+  }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+
+    await turnOn(page)
+
+    await expect(stepBoxes(page)).toHaveCount(stew.steps.length)
+    for (const [index, text] of stew.steps.entries()) {
+      const box = stepBox(page, index + 1)
+      await expect(box).toBeVisible()
+      await expect(box).not.toBeChecked()
+      await expect(box).toHaveAccessibleDescription(text)
+    }
+    await expect(stepTexts(page)).toHaveText(stew.steps)
+  })
+
+  test("clicking a step's text ticks it and crosses it out; clicking again unticks it", async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+
+    await stepTexts(page).first().click()
+
+    await expect(stepBox(page, 1)).toBeChecked()
+    await expect(stepBox(page, 2)).not.toBeChecked()
+    await expectStruck(page, 0)
+    await expectNotStruck(page, 1)
+
+    await stepTexts(page).first().click()
+
+    await expect(stepBox(page, 1)).not.toBeChecked()
+    await expectNotStruck(page, 0)
+  })
+
+  test('Tab reaches the step checkboxes in order after the ingredients, and Space toggles one', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+
+    await ingredientItems(page).getByRole('checkbox').last().focus()
+    await page.keyboard.press('Tab')
+    await expect(stepBox(page, 1)).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(stepBox(page, 2)).toBeFocused()
+
+    await page.keyboard.press('Space')
+    await expect(stepBox(page, 2)).toBeChecked()
+    await expectStruck(page, 1)
+    await page.keyboard.press('Space')
+    await expect(stepBox(page, 2)).not.toBeChecked()
+  })
+
+  test('ticks survive turning cook mode off and on again, and are hidden while it is off', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+    await stepBox(page, 2).check()
+
+    await cookMode(page).click()
+    await expect(cookMode(page)).toHaveAttribute('aria-pressed', 'false')
+    await expect(stepBoxes(page)).toHaveCount(0)
+    await expect(stepTexts(page)).toHaveText(stew.steps)
+    for (const index of stew.steps.keys()) await expectNotStruck(page, index)
+
+    await turnOn(page)
+    await expect(stepBox(page, 1)).not.toBeChecked()
+    await expect(stepBox(page, 2)).toBeChecked()
+    await expectStruck(page, 1)
+  })
+
+  test('ticks survive changing the servings', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+    await stepBox(page, 1).check()
+
+    await increaseServings(page).click()
+    await expect(servingsStatus(page)).toHaveText('for 7 servings')
+
+    await expect(stepBox(page, 1)).toBeChecked()
+    await expect(stepBox(page, 2)).not.toBeChecked()
+    await expectStruck(page, 0)
+  })
+
+  test('ingredient ticks and step ticks are independent', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+
+    await stepBox(page, 1).check()
+    for (const box of await ingredientItems(page).getByRole('checkbox').all()) await expect(box).not.toBeChecked()
+
+    await ingredientBox(page).check()
+    await expect(stepBox(page, 1)).toBeChecked()
+    await expect(stepBox(page, 2)).not.toBeChecked()
+
+    await stepBox(page, 1).uncheck()
+    await expect(ingredientBox(page)).toBeChecked()
+  })
+
+  test('a reload turns cook mode off and clears every step tick', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+    await stepBox(page, 1).check()
+    await stepBox(page, 2).check()
+
+    await page.reload()
+    await waitForCookMode(page)
+
+    await expect(cookMode(page)).toHaveAttribute('aria-pressed', 'false')
+    await expect(stepBoxes(page)).toHaveCount(0)
+
+    await turnOn(page)
+    await expect(stepBox(page, 1)).not.toBeChecked()
+    await expect(stepBox(page, 2)).not.toBeChecked()
+    for (const index of stew.steps.keys()) await expectNotStruck(page, index)
+  })
+
+  test('printing hides the step checkboxes and does not cross out a ticked step', async ({ page }) => {
+    await fakeWakeLock(page)
+    await openForCooking(page)
+    await turnOn(page)
+    await stepBox(page, 1).check()
+    await expectStruck(page, 0)
+
+    await page.emulateMedia({ media: 'print' })
+
+    // getByRole skips display:none elements, so count the hidden boxes explicitly.
+    const hiddenBoxes = stepsList(page).getByRole('checkbox', { includeHidden: true })
+    await expect(hiddenBoxes).toHaveCount(stew.steps.length)
+    for (const box of await hiddenBoxes.all()) await expect(box).toBeHidden()
+    await expect(stepTexts(page)).toHaveText(stew.steps)
+    await expect(stepTexts(page).first()).toBeVisible()
+    await expectNotStruck(page, 0)
+  })
 })

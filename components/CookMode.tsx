@@ -25,14 +25,19 @@ export default function CookMode({ className, children }: { className: string; c
   )
 }
 
+// Cook mode's state, for client parts of the page that change with it.
+export function useCookMode() {
+  const cookMode = useContext(CookModeContext)
+  if (!cookMode) throw new Error('useCookMode must be inside CookMode')
+  return cookMode
+}
+
 // The toggle, with a note once the screen can't be kept awake. The note sits in
 // an always-rendered live region, empty until then, so it's announced when it
 // appears; it isn't shown while the first request is still in flight.
 export function CookModeToggle() {
-  const cookMode = useContext(CookModeContext)
+  const { on, toggle, wakeLock } = useCookMode()
   const noteId = useId()
-  if (!cookMode) throw new Error('CookModeToggle must be inside CookMode')
-  const { on, toggle, wakeLock } = cookMode
   const showNote = on && wakeLock === 'unavailable'
 
   return (

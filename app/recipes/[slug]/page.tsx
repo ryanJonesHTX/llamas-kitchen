@@ -8,6 +8,7 @@ import { auth } from '../../../auth'
 import CookMode, { CookModeToggle } from '../../../components/CookMode'
 import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
 import ServingsIngredients from '../../../components/ServingsIngredients'
+import StepChecklist from '../../../components/StepChecklist'
 import { formatMinutes } from '../../../lib/recipes/duration'
 import { recipeImageUrl } from '../../../lib/recipes/image'
 import { listingHref } from '../../../lib/recipes/listingHref'
@@ -128,21 +129,7 @@ export default async function RecipePage({ params }: Props) {
             <h2 id="steps-heading" className={SECTION_HEADING}>
               Steps
             </h2>
-            <ol role="list" aria-labelledby="steps-heading" className="mt-6 max-w-2xl list-none space-y-8 not-print:group-data-cook-mode/cook:space-y-10">
-              {recipe.steps.map((step, index) => (
-                <li key={index} className="flex gap-x-4 print:break-inside-avoid">
-                  <span
-                    aria-hidden="true"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-lg font-semibold text-on-accent-soft tabular-nums print:bg-transparent print:ring-1 print:ring-border-strong"
-                  >
-                    {index + 1}
-                  </span>
-                  <p className="min-w-0 whitespace-pre-line pt-1 text-lg leading-8 text-text not-print:group-data-cook-mode/cook:text-2xl not-print:group-data-cook-mode/cook:leading-10">
-                    {step}
-                  </p>
-                </li>
-              ))}
-            </ol>
+            <StepChecklist steps={recipe.steps} labelledBy="steps-heading" />
           </section>
 
           {recipe.notes && (

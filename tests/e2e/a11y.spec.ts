@@ -132,6 +132,23 @@ const scenarios: Scenario[] = [
     },
   },
   {
+    name: 'recipe page in cook mode with a step ticked',
+    open: async (page) => {
+      await fakeWakeLock(page)
+      await openRecipe(page, stew.slug)
+      const cookMode = page.getByRole('button', { name: 'Cook mode', exact: true })
+      await expect(cookMode).toBeVisible()
+      await expect
+        .poll(() => cookMode.evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))))
+        .toBe(true)
+      await cookMode.click()
+      await expect(cookMode).toHaveAttribute('aria-pressed', 'true')
+      const firstStep = page.getByRole('checkbox', { name: 'Step 1', exact: true })
+      await firstStep.check()
+      await expect(firstStep).toBeChecked()
+    },
+  },
+  {
     name: 'pending recipe page with its status banner',
     open: async (page, context) => {
       await signInAsAdmin(context)
