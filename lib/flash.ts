@@ -14,9 +14,16 @@ const FLASH_MESSAGES = {
   submitted: 'Recipe submitted for review',
   approved: 'Recipe approved',
   rejected: 'Recipe rejected',
+  linkCopied: 'Link copied',
+  copyFailed: "Couldn't copy the link",
 } as const
 
 export type FlashKey = keyof typeof FLASH_MESSAGES
+
+export type FlashTone = 'success' | 'error'
+
+// Every flash is a success unless listed here.
+const ERROR_KEYS: ReadonlySet<FlashKey> = new Set(['copyFailed'])
 
 // document.cookie assignments that set the flash and clear it.
 export function flashCookie(key: FlashKey): string {
@@ -37,4 +44,10 @@ export function flashCookieValue(documentCookie: string): string | undefined {
 // Unknown keys map to null and are ignored.
 export function flashMessage(key: string | undefined): string | null {
   return Object.hasOwn(FLASH_MESSAGES, key ?? '') ? FLASH_MESSAGES[key as FlashKey] : null
+}
+
+// The Toaster's icon for a flash. Unknown keys map to null.
+export function flashTone(key: string | undefined): FlashTone | null {
+  if (!Object.hasOwn(FLASH_MESSAGES, key ?? '')) return null
+  return ERROR_KEYS.has(key as FlashKey) ? 'error' : 'success'
 }

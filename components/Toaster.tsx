@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline'
-import { CLEAR_FLASH_COOKIE, FLASH_EVENT, flashCookieValue, flashMessage } from '../lib/flash'
+import { CheckCircleIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { CLEAR_FLASH_COOKIE, FLASH_EVENT, flashCookieValue, flashMessage, flashTone, type FlashTone } from '../lib/flash'
 
 const DISMISS_AFTER_MS = 4000
 
@@ -17,7 +17,7 @@ const DISMISS_AFTER_MS = 4000
 // the id, is inserted (and announced) again.
 export default function Toaster() {
   const pathname = usePathname()
-  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
+  const [toast, setToast] = useState<{ text: string; tone: FlashTone; id: number } | null>(null)
   const lastId = useRef(0)
   const message = toast?.text
 
@@ -27,7 +27,8 @@ export default function Toaster() {
       if (key === undefined) return
       document.cookie = CLEAR_FLASH_COOKIE
       const text = flashMessage(key)
-      setToast(text === null ? null : { text, id: ++lastId.current })
+      const tone = flashTone(key)
+      setToast(text === null || tone === null ? null : { text, tone, id: ++lastId.current })
     }
     // The cookie is browser state, readable only after mount; no render can derive it.
     showFlash()
@@ -50,7 +51,8 @@ export default function Toaster() {
             : 'translate-y-2 opacity-0'
         }`}
       >
-        {message && <CheckCircleIcon className="size-5 shrink-0 text-success" aria-hidden="true" />}
+        {toast?.tone === 'success' && <CheckCircleIcon className="size-5 shrink-0 text-success" aria-hidden="true" />}
+        {toast?.tone === 'error' && <ExclamationCircleIcon className="size-5 shrink-0 text-danger" aria-hidden="true" />}
         <p role="status" aria-live="polite">
           {toast && <span key={toast.id}>{toast.text}</span>}
         </p>

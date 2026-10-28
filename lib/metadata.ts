@@ -31,3 +31,9 @@ export function siteMetadata(): Metadata {
     twitter: { card: 'summary_large_image' },
   }
 }
+
+// The link the recipe page's Share button shares: the recipe's path on the
+// public origin, with no query string or hash.
+export function recipeShareUrl(slug: string): string {
+  return new URL('/recipes/' + slug, requireEnv('AUTH_URL')).href
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLEAR_FLASH_COOKIE, FLASH_COOKIE, flashCookie, flashCookieValue, flashMessage } from '../../lib/flash'
+import { CLEAR_FLASH_COOKIE, FLASH_COOKIE, flashCookie, flashCookieValue, flashMessage, flashTone } from '../../lib/flash'
 
 describe('flash constants', () => {
   it('uses a cookie named "flash"', () => {
@@ -56,10 +56,47 @@ describe('flashMessage', () => {
     expect(flashMessage(key)).toBe(message)
   })
 
+  it.each([
+    ['linkCopied', 'Link copied'],
+    ['copyFailed', "Couldn't copy the link"],
+  ])('maps the share key %j to %j', (key, message) => {
+    expect(flashMessage(key)).toBe(message)
+  })
+
   it.each([[undefined], [''], ['Saved'], ['hacked'], ['<b>hi</b>'], ['toString'], ['__proto__'], ['constructor']])(
     'ignores the unknown key %j',
     (key) => {
       expect(flashMessage(key)).toBeNull()
     }
   )
+})
+
+describe('flashTone', () => {
+  it.each([['saved'], ['submitted'], ['approved'], ['rejected'], ['linkCopied']])(
+    'gives %j the success tone',
+    (key) => {
+      expect(flashTone(key)).toBe('success')
+    }
+  )
+
+  it('gives "copyFailed" the error tone', () => {
+    expect(flashTone('copyFailed')).toBe('error')
+  })
+
+  it.each([[undefined], [''], ['hacked'], ['toString'], ['__proto__'], ['constructor']])(
+    'has no tone for the unknown key %j',
+    (key) => {
+      expect(flashTone(key)).toBeNull()
+    }
+  )
+})
+
+describe('the share flash keys', () => {
+  it.each([
+    ['linkCopied', 'Link copied'],
+    ['copyFailed', "Couldn't copy the link"],
+  ] as const)('%j round-trips through the cookie to %j', (key, message) => {
+    const pair = flashCookie(key).split('; ')[0]
+    expect(flashMessage(flashCookieValue(pair))).toBe(message)
+  })
 })

@@ -7,9 +7,10 @@ import { ArrowTopRightOnSquareIcon, ClockIcon, FireIcon, ScissorsIcon, UsersIcon
 import { auth } from '../../../auth'
 import CookMode, { CookModeToggle } from '../../../components/CookMode'
 import RecipeStatusBanner from '../../../components/RecipeStatusBanner'
+import ShareButton from '../../../components/ShareButton'
 import ServingsIngredients from '../../../components/ServingsIngredients'
 import StepChecklist from '../../../components/StepChecklist'
-import { previewImage, SITE_NAME } from '../../../lib/metadata'
+import { previewImage, recipeShareUrl, SITE_NAME } from '../../../lib/metadata'
 import { formatMinutes } from '../../../lib/recipes/duration'
 import { recipeImageUrl } from '../../../lib/recipes/image'
 import { listingHref } from '../../../lib/recipes/listingHref'
@@ -113,6 +114,9 @@ export default async function RecipePage({ params }: Props) {
                 Edit
               </Link>
             )}
+            {/* Before Cook mode, which is followed by its live note. Hidden recipes
+                would 404 for anyone the link is shared with. */}
+            {recipe.status === 'published' && <ShareButton title={recipe.name} url={recipeShareUrl(recipe.slug)} />}
             <CookModeToggle />
           </div>
         </div>

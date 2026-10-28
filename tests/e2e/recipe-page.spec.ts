@@ -209,7 +209,7 @@ test.describe('the ingredient checklist', () => {
   })
 
   // The skip link jumps past the header; the tag links come next, then the
-  // Cook mode button, the servings stepper's two buttons, then the first ingredient.
+  // Share and Cook mode buttons, the servings stepper's two buttons, then the first ingredient.
   test('Tab reaches a checkbox and Space toggles it', async ({ page }) => {
     const stew = seedRecipe('E2E Beef Stew')
     await page.goto(`/recipes/${stew.slug}`)
@@ -220,6 +220,8 @@ test.describe('the ingredient checklist', () => {
       await page.keyboard.press('Tab')
       await expect(tagLinks(page).nth(index)).toBeFocused()
     }
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Share', exact: true })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Cook mode', exact: true })).toBeFocused()
     for (const name of ['Decrease servings', 'Increase servings']) {

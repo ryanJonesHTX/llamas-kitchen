@@ -267,7 +267,7 @@ test('the chosen servings stay out of the URL, and a reload returns to the recip
 })
 
 // The skip link jumps past the header; the recipe's tag link comes next, then the
-// Cook mode button, then the stepper.
+// Share and Cook mode buttons, then the stepper.
 test('the stepper works from the keyboard: Tab reaches Decrease then Increase, Enter and Space press them', async ({
   page,
 }) => {
@@ -277,6 +277,8 @@ test('the stepper works from the keyboard: Tab reaches Decrease then Increase, E
   await page.keyboard.press('Enter')
   await page.keyboard.press('Tab')
   await expect(tagLinks(page).first()).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Share', exact: true })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Cook mode', exact: true })).toBeFocused()
   await page.keyboard.press('Tab')
