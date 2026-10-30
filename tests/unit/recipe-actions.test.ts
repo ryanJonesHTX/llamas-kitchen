@@ -9,13 +9,14 @@ import {
   UPLOAD_RATE_LIMIT,
   UPLOAD_RATE_WINDOW_MS,
 } from '../../lib/constants'
+import { FetchPageError, type FetchPageErrorReason } from '../../lib/import/fetchPage'
 import { signUploadParams } from '../../lib/uploadSignature'
 import { ALLOWED_FORMATS, MAX_UPLOAD_BYTES, UPLOAD_FOLDER, UPLOAD_TRANSFORMATION } from '../../lib/uploads'
 
 // The server actions in app/recipes/actions.ts against an in-memory MongoDB
 // and the real recipe model. Only the session (auth.ts pulls in next-auth),
 // next/navigation (imported by lib/guards), next/cache (revalidatePath needs
-// a Next request) and Cloudinary (global fetch) are faked.
+// a Next request), Cloudinary (global fetch) and the import page fetcher are faked.
 
 const { auth } = vi.hoisted(() => ({ auth: vi.fn() }))
 vi.mock('../../auth', () => ({ auth }))
@@ -37,6 +38,13 @@ vi.mock('next/navigation', () => ({
 vi.mock('../../lib/recipes/slug', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/recipes/slug')>()
   return { uniqueSlug: vi.fn(actual.uniqueSlug) }
+})
+
+// The real FetchPageError; fetchPage answers with whatever page a test gives it.
+const { fetchPage } = vi.hoisted(() => ({ fetchPage: vi.fn() }))
+vi.mock('../../lib/import/fetchPage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/import/fetchPage')>()
+  return { ...actual, fetchPage }
 })
 
 const cloudinaryEnv = {
@@ -1384,5 +1392,254 @@ describe('deleteRecipe', () => {
     const id = await seed(pendingDoc())
     expect(await actions.deleteRecipe(id.toHexString())).toEqual({ ok: true })
     expect(revalidatePath).toHaveBeenCalledWith('/admin/queue')
+  })
+})
+
+// ---------------------------------------------------------------- import
+
+describe('importRecipe', () => {
+  const now = new Date('2026-10-30T12:00:00.000Z')
+  const LINK_ERROR = { ok: false, error: 'Enter a link that starts with http:// or https://.' }
+  const COULDNT_LOAD = { ok: false, error: "That link couldn't be loaded." }
+  const ENTERED_URL = 'https://example.com/s/stew'
+  // Where the page was fetched from after redirects.
+  const FINAL_URL = 'https://www.example.com/recipes/beef-stew'
+  const IMAGE_URL = 'https://cdn.example.com/photos/stew.jpg'
+
+  const recipePage = (recipe: Record<string, unknown>) =>
+    `<!doctype html><html><head><script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Recipe',
+      name: 'Beef Stew',
+      description: 'Hearty and warm.',
+      recipeIngredient: ['2 cups beef stock', 'Salt to taste'],
+      recipeInstructions: ['Brown the beef.', 'Simmer for two hours.'],
+      recipeYield: '4',
+      prepTime: 'PT20M',
+      cookTime: 'PT2H',
+      recipeCategory: 'Dinner',
+      author: { '@type': 'Person', name: 'Grandma' },
+      ...recipe,
+    })}</script></head><body><h1>Beef Stew</h1></body></html>`
+
+  // The prefill the parser gives for recipePage, before any photo.
+  const parsedValues = {
+    name: 'Beef Stew',
+    description: 'Hearty and warm.',
+    ingredients: [{ line: '2 cups beef stock' }, { line: 'Salt to taste' }],
+    steps: [{ text: 'Brown the beef.' }, { text: 'Simmer for two hours.' }],
+    tags: ['dinner'],
+    servings: '4',
+    prepTime: '20',
+    cookTime: '120',
+    notes: '',
+    credit: 'Grandma',
+    sourceUrl: FINAL_URL,
+  }
+
+  const servePage = (html: string) => fetchPage.mockResolvedValue({ finalUrl: FINAL_URL, html })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+    fetchPage.mockReset()
+    servePage(recipePage({ image: IMAGE_URL }))
+    fetchMock.mockImplementation(async () => cloudinaryOk('recipes/imported123'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it.each([
+    ['no session', null],
+    ['a signed-in user who is not an admin', userSession],
+  ])('throws for %s and fetches nothing', async (_label, session) => {
+    auth.mockResolvedValue(session)
+
+    await expect(actions.importRecipe(ENTERED_URL)).rejects.toThrow('Forbidden')
+    expect(fetchPage).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    // Typed as a string, but a client can post any serializable value.
+    ['a number', 42 as unknown as string],
+    ['null', null as unknown as string],
+    ['an object', { href: ENTERED_URL } as unknown as string],
+    ['an empty string', ''],
+    ['a blank string', '   '],
+    ['a javascript: link', 'javascript:alert(1)'],
+    ['an ftp link', 'ftp://x'],
+    ['text that is not a url', 'not a url'],
+  ])('returns the link error for %s without fetching', async (_label, url) => {
+    expect(await actions.importRecipe(url)).toEqual(LINK_ERROR)
+    expect(fetchPage).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('trims the url before fetching it', async () => {
+    await actions.importRecipe(`  ${ENTERED_URL}\n`)
+    expect(fetchPage).toHaveBeenCalledExactlyOnceWith(ENTERED_URL)
+  })
+
+  it.each([
+    ['invalid-url'],
+    ['blocked'],
+    ['redirects'],
+    ['timeout'],
+    ['too-large'],
+    ['not-html'],
+    ['status'],
+    ['network'],
+  ] as [FetchPageErrorReason][])(
+    "returns the couldn't-be-loaded error for a %s fetch failure, logging the reason but not the url",
+    async (reason) => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      fetchPage.mockRejectedValue(new FetchPageError(reason, `Refused ${ENTERED_URL}`))
+
+      expect(await actions.importRecipe(ENTERED_URL)).toEqual(COULDNT_LOAD)
+      expect(consoleError).toHaveBeenCalledExactlyOnceWith(`Recipe import fetch failed: ${reason}`)
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it('rethrows any other error from fetchPage, failing fast', async () => {
+    const error = new Error('bug in the fetcher')
+    fetchPage.mockRejectedValue(error)
+    await expect(actions.importRecipe(ENTERED_URL)).rejects.toBe(error)
+  })
+
+  it('returns the no-recipe error for a page with no Recipe, without uploading', async () => {
+    servePage(
+      '<html><head><script type="application/ld+json">{"@type":"Article","name":"Not food"}</script></head></html>'
+    )
+    expect(await actions.importRecipe(ENTERED_URL)).toEqual({ ok: false, error: 'No recipe found on that page.' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("parses the page at its final url and returns its values with the imported photo's public id", async () => {
+    expect(await actions.importRecipe(ENTERED_URL)).toEqual({
+      ok: true,
+      values: { ...parsedValues, imagePublicId: 'recipes/imported123' },
+      photoFailed: false,
+    })
+  })
+
+  it('imports the photo with one signed upload to Cloudinary, sending the image url as the file', async () => {
+    await actions.importRecipe(ENTERED_URL)
+
+    const { url, method, form } = await sentRequest()
+    expect(url).toBe(CLOUDINARY_UPLOAD_URL)
+    expect(method).toBe('POST')
+    expect([...form.keys()].sort()).toEqual([
+      'allowed_formats',
+      'api_key',
+      'file',
+      'folder',
+      'signature',
+      'timestamp',
+      'transformation',
+    ])
+    expect(form.get('file')).toBe(IMAGE_URL)
+    expect(form.get('api_key')).toBe(cloudinaryEnv.CLOUDINARY_API_KEY)
+    expect(form.get('timestamp')).toBe(String(Math.floor(now.getTime() / 1000)))
+    expect(form.get('folder')).toBe(UPLOAD_FOLDER)
+    expect(form.get('allowed_formats')).toBe(ALLOWED_FORMATS)
+    expect(form.get('transformation')).toBe(UPLOAD_TRANSFORMATION)
+    const signed = {
+      folder: String(form.get('folder')),
+      timestamp: String(form.get('timestamp')),
+      allowed_formats: String(form.get('allowed_formats')),
+      transformation: String(form.get('transformation')),
+    }
+    expect(form.get('signature')).toBe(signUploadParams(signed, cloudinaryEnv.CLOUDINARY_API_SECRET))
+    // The secret signs the request; it is never sent.
+    for (const value of form.values()) expect(value).not.toBe(cloudinaryEnv.CLOUDINARY_API_SECRET)
+  })
+
+  it('sends the photo upload with an abort signal, so a stalled import is cut off', async () => {
+    await actions.importRecipe(ENTERED_URL)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('returns the values with no photo and photoFailed false, without calling Cloudinary, when the page has no image', async () => {
+    servePage(recipePage({}))
+
+    expect(await actions.importRecipe(ENTERED_URL)).toEqual({ ok: true, values: parsedValues, photoFailed: false })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  describe('when the photo upload fails, the import still succeeds', () => {
+    // Each failure echoes the request's signature back, as Cloudinary's error
+    // messages can, so a log line that includes the body or error message shows.
+    const failures: [string, (signature: string) => Promise<Response>][] = [
+      [
+        'Cloudinary answers 500',
+        async (signature) =>
+          new Response(JSON.stringify({ error: { message: `Invalid Signature ${signature}` } }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          }),
+      ],
+      [
+        'the request times out',
+        async (signature) => {
+          throw new DOMException(`timed out ${signature}`, 'TimeoutError')
+        },
+      ],
+      [
+        'the network fails',
+        async (signature) => {
+          throw new TypeError(`fetch failed ${signature}`)
+        },
+      ],
+    ]
+
+    it.each(failures)(
+      'returns ok with photoFailed true and no imagePublicId, and logs no secrets, when %s',
+      async (_label, fail) => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+        let signature = ''
+        fetchMock.mockImplementation(async (...args: Parameters<typeof fetch>) => {
+          signature = String((await new Request(...args).formData()).get('signature'))
+          return fail(signature)
+        })
+
+        expect(await actions.importRecipe(ENTERED_URL)).toEqual({ ok: true, values: parsedValues, photoFailed: true })
+        expect(signature).toMatch(/^[0-9a-f]{40}$/)
+        expect(consoleError).toHaveBeenCalled()
+        const logged = JSON.stringify(consoleError.mock.calls.map((args) => args.map(String)))
+        expect(logged).not.toContain(cloudinaryEnv.CLOUDINARY_API_SECRET)
+        expect(logged).not.toContain(signature)
+      }
+    )
+  })
+
+  it.each([
+    ['outside the recipes folder', 'samples/imported123'],
+    ['nested inside the recipes folder', 'recipes/nested/imported123'],
+    ['climbing out of the recipes folder', 'recipes/../imported123'],
+  ])('throws when Cloudinary returns a public_id %s', async (_label, publicId) => {
+    fetchMock.mockImplementation(async () => cloudinaryOk(publicId))
+    await expect(actions.importRecipe(ENTERED_URL)).rejects.toThrow()
+  })
+
+  it('throws when Cloudinary returns no public_id', async () => {
+    fetchMock.mockImplementation(
+      async () => new Response(JSON.stringify({ format: 'jpg' }), { status: 200, headers: { 'content-type': 'application/json' } })
+    )
+    await expect(actions.importRecipe(ENTERED_URL)).rejects.toThrow()
+  })
+
+  it('throws rather than flagging photoFailed when Cloudinary is not configured', async () => {
+    vi.stubEnv('CLOUDINARY_API_SECRET', undefined)
+    try {
+      await expect(actions.importRecipe(ENTERED_URL)).rejects.toThrow('CLOUDINARY_API_SECRET is not set')
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.stubEnv('CLOUDINARY_API_SECRET', cloudinaryEnv.CLOUDINARY_API_SECRET)
+    }
   })
 })
