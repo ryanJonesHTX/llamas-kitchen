@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import { Recipe, type RecipeRecord } from '../../lib/recipes/model.ts'
 import { E2E_MONGODB_DB, E2E_MONGODB_PORT, seedRecipes, type SeedRecipe } from './fixtures.ts'
+import { resetRecipeSite } from './recipeSite.ts'
 import { resetCloudinaryUploads } from './uploads.ts'
 
 // Hardcoded to the local in-memory server; never read from the environment.
@@ -23,7 +24,8 @@ export async function connect() {
 
 // Replaces every recipe with the seed fixtures, builds the recipe indexes (as
 // scripts/sync-indexes.ts does, so the unique slug index exists), signs
-// everyone out and clears the fake Cloudinary's upload and destroy logs.
+// everyone out, clears the fake Cloudinary's upload and destroy logs and
+// holds the fake recipe site's slow page again.
 export async function reseed() {
   const connection = await connect()
   await Recipe.deleteMany({})
@@ -33,6 +35,7 @@ export async function reseed() {
   await connection.collection(USERS_COLLECTION).deleteMany({})
   await connection.collection(SESSIONS_COLLECTION).deleteMany({})
   resetCloudinaryUploads()
+  resetRecipeSite()
 }
 
 // Adds recipes on top of the seed, for tests that need more than it holds.

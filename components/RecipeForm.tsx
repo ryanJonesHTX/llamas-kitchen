@@ -20,6 +20,8 @@ import { recipeInputSchema } from '../lib/recipes/input'
 import type { RecipeStatus } from '../lib/recipes/model'
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from '../lib/uploads'
 import RecipeStatusBanner from './RecipeStatusBanner'
+import { CARD, CARD_HEADING, ERROR, errorProps, HELP, INPUT, LABEL, SECONDARY_BUTTON } from './formStyles'
+import ImportRecipe from './ImportRecipe'
 import { SortableItem, SortableList } from './SortableList'
 import TagInput from './TagInput'
 
@@ -78,21 +80,6 @@ const NO_INPUT_ERRORS = {
 
 const SAVE_FAILED = 'Something went wrong and the recipe was not saved. Reload the page and try again.'
 const UPLOAD_FAILED = 'Something went wrong and the image was not uploaded. Reload the page and try again.'
-
-// Input colors and focus rings come from the forms-plugin overrides in styles/globals.css.
-const LABEL = 'block text-sm font-medium text-text'
-const INPUT = 'block min-h-11 w-full min-w-0 rounded-lg shadow-xs sm:text-sm'
-const HELP = 'mt-2 text-sm text-muted'
-const ERROR = 'mt-2 text-sm text-danger'
-const CARD = 'rounded-xl border border-border bg-surface p-6'
-const CARD_HEADING = 'font-display text-xl text-text text-balance'
-const SECONDARY_BUTTON =
-  'inline-flex min-h-11 items-center gap-x-2 rounded-lg border border-border-strong bg-surface px-4 text-sm font-semibold text-text hover:bg-primary-soft hover:text-on-primary-soft'
-
-// Marks an input invalid and points it at its error message.
-function errorProps(id: string, error: string | undefined) {
-  return error ? { 'aria-invalid': true, 'aria-describedby': `${id}-error` } : {}
-}
 
 // A list field's first message, wherever it was filed: on the list itself
 // (setError), under its root (the resolver, for a field array), or under an
@@ -171,6 +158,7 @@ function setFlash(key: FlashKey) {
 // Creates a recipe, or with `recipeId` (and its `status`) edits that recipe.
 // Only admins see the slug. A recipe a non-admin creates, or resubmits after
 // rejection, waits for review, and the labels say so.
+// Admins creating a recipe can fill the form from a recipe page (ImportRecipe).
 // Images upload through the uploadRecipeImage action as soon as one is chosen.
 // `imageUrlPrefix` (recipeImageUrlPrefix) plus a public ID is the preview's Cloudinary URL.
 // `tagSuggestions` are the tags published recipes use (publishedTagsInUse).
@@ -213,6 +201,7 @@ export default function RecipeForm({
   const [uploaded, setUploaded] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [importing, setImporting] = useState(false)
   // The chosen file, shown while it uploads.
   const [localPreview, setLocalPreview] = useState<string | null>(null)
   const {
@@ -222,6 +211,7 @@ export default function RecipeForm({
     getValues,
     handleSubmit,
     register,
+    reset,
     setError,
     setFocus,
     setValue,
@@ -281,6 +271,14 @@ export default function RecipeForm({
     showInvalid(Object.keys(result.fieldErrors))
   }
 
+  // An import replaces the whole form, its image included.
+  function applyImport(values: RecipeFormValues) {
+    reset(values)
+    setUploaded(false)
+    setUploadError('')
+    setLocalPreview(null)
+  }
+
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const input = event.target
     const file = input.files?.[0]
@@ -327,6 +325,13 @@ export default function RecipeForm({
       </p>
       {forReview && <p className="mt-1 text-sm text-muted">Submissions are reviewed before they appear publicly.</p>}
       {status === 'rejected' && <RecipeStatusBanner status={status} rejectionReason={rejectionReason} className="mt-6" />}
+      {admin && !recipeId && (
+        <ImportRecipe
+          disabled={uploading || isSubmitting}
+          onImported={applyImport}
+          onImportingChange={setImporting}
+        />
+      )}
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit(save, (invalid) => showInvalid(Object.keys(invalid)))} noValidate>
         <Card id="basics" title="Basics">
@@ -547,7 +552,7 @@ export default function RecipeForm({
                 accept="image/*"
                 aria-describedby={uploadError ? 'file-upload-error' : undefined}
                 onChange={handleUpload}
-                disabled={uploading}
+                disabled={uploading || importing}
                 className="sr-only"
               />
             </label>
@@ -608,7 +613,7 @@ export default function RecipeForm({
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={isSubmitting || uploading}
+              disabled={isSubmitting || uploading || importing}
               className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-on-primary shadow-xs hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitLabel}

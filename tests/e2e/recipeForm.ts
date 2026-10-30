@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { expect } from './test.ts'
 
 // The recipe form (components/RecipeForm.tsx) on /new and /recipes/<slug>/edit.
 // Every field is found by its exact label; the labels are the contract.
@@ -101,4 +102,34 @@ export async function fillNewRecipe(page: Page): Promise<void> {
   await formField(page, 'Prep time (minutes)').fill(newRecipe.prepTime)
   await formField(page, 'Cook time (minutes)').fill(newRecipe.cookTime)
   await formField(page, 'Credit').fill(newRecipe.credit)
+}
+
+// The admin-only "Import from a link" box above the form on /new
+// (components/ImportRecipe.tsx): its own small form, outside the recipe form.
+export const importBox = (page: Page) =>
+  page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { level: 2, name: 'Import from a link', exact: true }) })
+
+export const recipeLinkInput = (page: Page) => formField(page, 'Recipe link')
+
+export const importButton = (page: Page) => page.getByRole('button', { name: 'Import', exact: true })
+
+// The box's live region; empty until an import succeeds.
+export const importStatus = (page: Page) => importBox(page).getByRole('status')
+
+// Opens /new and waits until the Import button is hydrated, so a submit is
+// never lost to the browser's own form submission.
+export async function openImportForm(page: Page): Promise<void> {
+  await page.goto('/new')
+  await expect(importButton(page)).toBeVisible()
+  await expect
+    .poll(() => importButton(page).evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))))
+    .toBe(true)
+}
+
+// Pastes a link into the box and presses Import.
+export async function importFrom(page: Page, url: string): Promise<void> {
+  await recipeLinkInput(page).fill(url)
+  await importButton(page).click()
 }

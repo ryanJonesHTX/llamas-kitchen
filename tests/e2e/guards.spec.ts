@@ -154,7 +154,7 @@ test.describe('replaying an admin server action', () => {
     expect(cloudinaryUploads()).toEqual([])
 
     await replayAsAdmin(page, upload)
-    expect(cloudinaryUploads().map((u) => u.file.name)).toEqual(['replayed.png'])
+    expect(cloudinaryUploads().map((u) => u.file)).toEqual([expect.objectContaining({ name: 'replayed.png' })])
   })
 })
 
