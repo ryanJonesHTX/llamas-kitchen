@@ -6,6 +6,7 @@ import { z } from 'zod'
 import type { Session } from 'next-auth'
 import type { RecipeFormValues } from '../../components/RecipeForm'
 import {
+  MAX_IMPORTS_IN_FLIGHT,
   MAX_PENDING_PER_USER,
   MAX_REJECTION_REASON_LENGTH,
   UPLOAD_RATE_LIMIT,
@@ -77,6 +78,9 @@ const PENDING_CAP: SaveResult = {
 // submissions can't all pass the check. In-process: production is a single
 // `next start` process.
 const pendingCapLock = createKeyedLock()
+
+// Imports running now, capped at MAX_IMPORTS_IN_FLIGHT. In-process, like the above.
+let importsInFlight = 0
 
 // The same answer for a missing recipe and one already reviewed.
 const NOT_PENDING: ReviewResult = { ok: false, formError: 'This recipe is no longer waiting for review.' }
@@ -388,6 +392,18 @@ export async function importRecipe(url: string): Promise<ImportResult> {
     return { ok: false, error: 'Enter a link that starts with http:// or https://.' }
   }
 
+  if (importsInFlight >= MAX_IMPORTS_IN_FLIGHT) {
+    return { ok: false, error: 'An import is already running. Try again in a moment.' }
+  }
+  importsInFlight++
+  try {
+    return await importFromUrl(trimmed)
+  } finally {
+    importsInFlight--
+  }
+}
+
+async function importFromUrl(trimmed: string): Promise<ImportResult> {
   let page: FetchedPage
   try {
     page = await fetchPage(trimmed)

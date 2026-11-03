@@ -39,6 +39,9 @@ export const MAX_INGREDIENT_QUANTITY = 10000
 // Recipes a non-admin may have awaiting review at once. Admins are exempt.
 export const MAX_PENDING_PER_USER = 5
 
+// Recipe imports running at once, so a burst can't exhaust memory or DNS threads.
+export const MAX_IMPORTS_IN_FLIGHT = 2
+
 // The submitter sees the reason on their recipe page.
 export const MAX_REJECTION_REASON_LENGTH = 500
 

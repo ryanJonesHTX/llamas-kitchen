@@ -4,12 +4,13 @@ import mongoose, { Types } from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import { adminId, day, pendingDoc, recipeDoc, rejectedDoc } from '../fixtures/recipes'
 import {
+  MAX_IMPORTS_IN_FLIGHT,
   MAX_PENDING_PER_USER,
   MAX_REJECTION_REASON_LENGTH,
   UPLOAD_RATE_LIMIT,
   UPLOAD_RATE_WINDOW_MS,
 } from '../../lib/constants'
-import { FetchPageError, type FetchPageErrorReason } from '../../lib/import/fetchPage'
+import { FetchPageError, type FetchedPage, type FetchPageErrorReason } from '../../lib/import/fetchPage'
 import { signUploadParams } from '../../lib/uploadSignature'
 import { ALLOWED_FORMATS, MAX_UPLOAD_BYTES, UPLOAD_FOLDER, UPLOAD_TRANSFORMATION } from '../../lib/uploads'
 
@@ -1641,5 +1642,184 @@ describe('importRecipe', () => {
     } finally {
       vi.stubEnv('CLOUDINARY_API_SECRET', cloudinaryEnv.CLOUDINARY_API_SECRET)
     }
+  })
+
+  describe('the cap on imports in flight', () => {
+    const BUSY = { ok: false, error: 'An import is already running. Try again in a moment.' }
+    const imported = { ok: true, values: { ...parsedValues, imagePublicId: 'recipes/imported123' }, photoFailed: false }
+
+    // The cap is held in-process, so every import a test starts is settled
+    // afterwards, releasing anything still held, and no slot leaks into the next test.
+    let started: Promise<unknown>[]
+    let releases: (() => void)[]
+
+    beforeEach(() => {
+      started = []
+      releases = []
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(async () => {
+      vi.stubEnv('CLOUDINARY_API_SECRET', cloudinaryEnv.CLOUDINARY_API_SECRET)
+      for (const release of releases) release()
+      await Promise.allSettled(started)
+    })
+
+    const start = (url: string = ENTERED_URL) => {
+      const result = actions.importRecipe(url)
+      started.push(result)
+      return result
+    }
+    const startMany = (count: number) => Array.from({ length: count }, () => start())
+
+    // The next `count` page fetches stay open until released; later ones answer at once.
+    function holdPageFetches(count: number) {
+      const held: (() => void)[] = []
+      for (let i = 0; i < count; i++) {
+        fetchPage.mockImplementationOnce(
+          () =>
+            new Promise<FetchedPage>((resolve) => {
+              const release = () => resolve({ finalUrl: FINAL_URL, html: recipePage({ image: IMAGE_URL }) })
+              held.push(release)
+              releases.push(release)
+            })
+        )
+      }
+      return held
+    }
+
+    // The next `count` Cloudinary photo uploads stay open until released; later ones answer at once.
+    function holdPhotoUploads(count: number) {
+      const held: (() => void)[] = []
+      for (let i = 0; i < count; i++) {
+        fetchMock.mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              const release = () => resolve(cloudinaryOk('recipes/imported123'))
+              held.push(release)
+              releases.push(release)
+            })
+        )
+      }
+      return held
+    }
+
+    // Starts as many imports as the cap allows and waits until each is fetching its page.
+    async function fillTheCap() {
+      const held = holdPageFetches(MAX_IMPORTS_IN_FLIGHT)
+      const running = startMany(MAX_IMPORTS_IN_FLIGHT)
+      await vi.waitFor(() => expect(held).toHaveLength(MAX_IMPORTS_IN_FLIGHT))
+      return { running, release: () => held.forEach((release) => release()) }
+    }
+
+    it('allows two imports in flight', () => {
+      expect(MAX_IMPORTS_IN_FLIGHT).toBe(2)
+    })
+
+    it('refuses an import at once, without fetching or uploading, while the cap is full', async () => {
+      const { running, release } = await fillTheCap()
+
+      expect(await start()).toEqual(BUSY)
+      expect(fetchPage).toHaveBeenCalledTimes(MAX_IMPORTS_IN_FLIGHT)
+      expect(fetchMock).not.toHaveBeenCalled()
+
+      release()
+      expect(await Promise.all(running)).toEqual(Array(MAX_IMPORTS_IN_FLIGHT).fill(imported))
+    })
+
+    it('does not queue a refused import: it never runs once the slots free up', async () => {
+      const { running, release } = await fillTheCap()
+      const refused = start()
+      release()
+      await Promise.all(running)
+
+      expect(await refused).toEqual(BUSY)
+      expect(fetchPage).toHaveBeenCalledTimes(MAX_IMPORTS_IN_FLIGHT)
+      expect(fetchMock).toHaveBeenCalledTimes(MAX_IMPORTS_IN_FLIGHT)
+    })
+
+    it('holds the slot while the photo uploads to Cloudinary', async () => {
+      const held = holdPhotoUploads(MAX_IMPORTS_IN_FLIGHT)
+      const running = startMany(MAX_IMPORTS_IN_FLIGHT)
+      await vi.waitFor(() => expect(held).toHaveLength(MAX_IMPORTS_IN_FLIGHT))
+
+      expect(await start()).toEqual(BUSY)
+      expect(fetchPage).toHaveBeenCalledTimes(MAX_IMPORTS_IN_FLIGHT)
+      expect(fetchMock).toHaveBeenCalledTimes(MAX_IMPORTS_IN_FLIGHT)
+
+      held.forEach((release) => release())
+      expect(await Promise.all(running)).toEqual(Array(MAX_IMPORTS_IN_FLIGHT).fill(imported))
+    })
+
+    it.each([
+      ['no session', null],
+      ['a signed-in user who is not an admin', userSession],
+    ])('still throws Forbidden for %s while the cap is full', async (_label, session) => {
+      await fillTheCap()
+      auth.mockResolvedValue(session)
+
+      await expect(start()).rejects.toThrow('Forbidden')
+    })
+
+    it('still returns the link error for an invalid link while the cap is full', async () => {
+      await fillTheCap()
+      expect(await start('javascript:alert(1)')).toEqual(LINK_ERROR)
+    })
+
+    // Each outcome runs in every slot at once; if any path kept its slot, the
+    // follow-up imports would be refused.
+    it.each<[string, () => void, PromiseSettledResult<unknown>]>([
+      ['succeeds with a photo', () => {}, { status: 'fulfilled', value: imported }],
+      [
+        'succeeds with no photo on the page',
+        () => servePage(recipePage({})),
+        { status: 'fulfilled', value: { ok: true, values: parsedValues, photoFailed: false } },
+      ],
+      [
+        "returns the couldn't-be-loaded error",
+        () => fetchPage.mockRejectedValue(new FetchPageError('timeout', 'Timed out')),
+        { status: 'fulfilled', value: COULDNT_LOAD },
+      ],
+      [
+        'returns the no-recipe error',
+        () => servePage('<html><head></head><body>No recipe here</body></html>'),
+        { status: 'fulfilled', value: { ok: false, error: 'No recipe found on that page.' } },
+      ],
+      [
+        'flags photoFailed',
+        () => fetchMock.mockImplementation(async () => new Response('{}', { status: 500 })),
+        { status: 'fulfilled', value: { ok: true, values: parsedValues, photoFailed: true } },
+      ],
+      [
+        'throws an unexpected fetch error',
+        () => fetchPage.mockRejectedValue(new Error('bug in the fetcher')),
+        { status: 'rejected', reason: expect.any(Error) },
+      ],
+      [
+        'throws because Cloudinary is not configured',
+        () => vi.stubEnv('CLOUDINARY_API_SECRET', undefined),
+        { status: 'rejected', reason: expect.any(Error) },
+      ],
+      [
+        'throws on an invalid public_id from Cloudinary',
+        () => fetchMock.mockImplementation(async () => cloudinaryOk('samples/imported123')),
+        { status: 'rejected', reason: expect.any(Error) },
+      ],
+    ])('frees the slot after an import that %s', async (_label, arrange, outcome) => {
+      arrange()
+      expect(await Promise.allSettled(startMany(MAX_IMPORTS_IN_FLIGHT))).toEqual(
+        Array(MAX_IMPORTS_IN_FLIGHT).fill(outcome)
+      )
+
+      vi.stubEnv('CLOUDINARY_API_SECRET', cloudinaryEnv.CLOUDINARY_API_SECRET)
+      servePage(recipePage({ image: IMAGE_URL }))
+      fetchMock.mockImplementation(async () => cloudinaryOk('recipes/imported123'))
+      fetchPage.mockClear()
+
+      const { running, release } = await fillTheCap()
+      expect(await start()).toEqual(BUSY)
+      release()
+      expect(await Promise.all(running)).toEqual(Array(MAX_IMPORTS_IN_FLIGHT).fill(imported))
+    })
   })
 })
