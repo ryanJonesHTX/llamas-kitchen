@@ -25,13 +25,15 @@ await disconnect()
 
 // Answers the server's Cloudinary uploads; see fake-cloudinary.ts.
 const fakeCloudinary = fileURLToPath(new URL('./fake-cloudinary.ts', import.meta.url))
+// Serves the pages the recipe importer fetches; see fake-recipe-site.ts.
+const fakeRecipeSite = fileURLToPath(new URL('./fake-recipe-site.ts', import.meta.url))
 
 // Fake auth values: tests sign in by seeding sessions (tests/e2e/auth.ts) and
 // never reach GitHub or Resend. Plain http keeps the cookie unprefixed
 // (authjs.session-token). Cloudinary values are fake too, and the preload
-// answers uploads to the fake cloud name.
+// answers uploads to the fake cloud name. The importer only reaches the fake recipe site.
 const e2eEnv = {
-  NODE_OPTIONS: `--import ${fakeCloudinary}`,
+  NODE_OPTIONS: `--import ${fakeCloudinary} --import ${fakeRecipeSite}`,
   MONGODB_URI: E2E_MONGODB_URI,
   AUTH_SECRET: 'e2e-test-secret-not-for-production',
   AUTH_URL: E2E_AUTH_URL,

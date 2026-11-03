@@ -5,7 +5,18 @@ import { expect, test } from './test.ts'
 import { signInAs } from './auth.ts'
 import { deleteAllRecipes, disconnect, insertRecipes, reseed } from './db.ts'
 import { pendingRecipe, rejectedRecipe, SEED_SUBMITTER_ID, seedRecipe } from './fixtures.ts'
-import { addTags, fillSteps, saveButton, stepField, tagInput } from './recipeForm.ts'
+import {
+  addTags,
+  fillSteps,
+  importBox,
+  importFrom,
+  importStatus,
+  openImportForm,
+  saveButton,
+  stepField,
+  tagInput,
+} from './recipeForm.ts'
+import { recipeSiteUrl } from './recipeSite.ts'
 import { disableAutoLoad, pagingRecipes } from './paging.ts'
 import { openRecipe } from './recipePage.ts'
 import { fakeWakeLock } from './wakeLock.ts'
@@ -205,6 +216,32 @@ const scenarios: Scenario[] = [
       await addTags(page, ['beef', 'weeknight'])
       await tagInput(page).fill('c')
       await expect(page.getByRole('option', { name: 'chicken', exact: true })).toBeVisible()
+    },
+  },
+  {
+    name: "admin's new recipe form with the import box",
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await openImportForm(page)
+    },
+  },
+  {
+    name: "admin's new recipe form after importing a recipe with a photo",
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await openImportForm(page)
+      await importFrom(page, recipeSiteUrl('lasagna'))
+      await expect(importStatus(page)).toHaveText('Recipe imported. Check it over before saving.')
+      await expect(page.getByRole('img', { name: 'Recipe photo preview', exact: true })).toBeVisible()
+    },
+  },
+  {
+    name: "admin's new recipe form after a failed import",
+    open: async (page, context) => {
+      await signInAsAdmin(context)
+      await openImportForm(page)
+      await importFrom(page, recipeSiteUrl('not-a-recipe'))
+      await expect(importBox(page).getByRole('alert')).toHaveText('No recipe found on that page.')
     },
   },
   {

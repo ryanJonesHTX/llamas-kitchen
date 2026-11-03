@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { Error as mongooseError, isObjectIdOrHexString, mongo, Types, type HydratedDocument } from 'mongoose'
 import { z } from 'zod'
 import type { Session } from 'next-auth'
+import type { RecipeFormValues } from '../../components/RecipeForm'
 import {
+  MAX_IMPORTS_IN_FLIGHT,
   MAX_PENDING_PER_USER,
   MAX_REJECTION_REASON_LENGTH,
   UPLOAD_RATE_LIMIT,
@@ -14,17 +16,21 @@ import { requireAdminSession, requireUserSession } from '../../lib/guards'
 import dbConnect from '../../lib/dbConnect'
 import { requireEnv } from '../../lib/env'
 import { IMAGE_HEADER_BYTES, matchesImageType } from '../../lib/imageType'
+import { fetchPage, FetchPageError, type FetchedPage } from '../../lib/import/fetchPage'
+import { parseRecipePage } from '../../lib/import/parseRecipe'
 import { createKeyedLock } from '../../lib/keyedLock'
 import { recipeInputSchema } from '../../lib/recipes/input'
 import { Recipe, type RecipeRecord } from '../../lib/recipes/model'
 import { canEdit } from '../../lib/recipes/permissions'
 import { uniqueSlug } from '../../lib/recipes/slug'
+import { sourceUrlSchema } from '../../lib/recipes/sourceUrl'
 import { isAdmin } from '../../lib/roles'
 import { createRateLimiter } from '../../lib/signinRateLimit'
 import { SLUG_PATTERN } from '../../lib/slugify'
 import { signUploadParams } from '../../lib/uploadSignature'
 import {
   ALLOWED_FORMATS,
+  IMAGE_PUBLIC_ID_PATTERN,
   MAX_UPLOAD_BYTES,
   UPLOAD_FOLDER,
   UPLOAD_TOO_LARGE_MESSAGE,
@@ -46,12 +52,16 @@ export type ReviewResult = { ok: true } | { ok: false; fieldErrors: FieldErrors 
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string }
 
+export type ImportResult = { ok: true; values: RecipeFormValues; photoFailed: boolean } | { ok: false; error: string }
+
 // An admin edit may also change the slug.
 const recipeUpdateSchema = recipeInputSchema.extend({
   slug: z.string().regex(SLUG_PATTERN, 'lowercase letters and numbers joined by single hyphens'),
 })
 
 const UPLOAD_TIMEOUT_MS = 30_000
+// Cloudinary fetches an imported photo itself; our server never downloads it.
+const IMPORT_PHOTO_TIMEOUT_MS = 10_000
 const DESTROY_TIMEOUT_MS = 10_000
 
 // Per non-admin user, in-process: production is a single `next start` process.
@@ -68,6 +78,9 @@ const PENDING_CAP: SaveResult = {
 // submissions can't all pass the check. In-process: production is a single
 // `next start` process.
 const pendingCapLock = createKeyedLock()
+
+// Imports running now, capped at MAX_IMPORTS_IN_FLIGHT. In-process, like the above.
+let importsInFlight = 0
 
 // The same answer for a missing recipe and one already reviewed.
 const NOT_PENDING: ReviewResult = { ok: false, formError: 'This recipe is no longer waiting for review.' }
@@ -290,6 +303,43 @@ async function destroyRecipeImage(publicId: string): Promise<void> {
   }
 }
 
+// Signs the upload params and POSTs them to Cloudinary, with `file` as an
+// uploaded File or a URL Cloudinary fetches itself. Whatever fetch throws
+// propagates; each caller handles its own failures.
+async function postSignedUpload(file: File | string, timeoutMs: number): Promise<Response> {
+  const cloudName = requireEnv('CLOUDINARY_CLOUD_NAME')
+  const apiKey = requireEnv('CLOUDINARY_API_KEY')
+  const apiSecret = requireEnv('CLOUDINARY_API_SECRET')
+
+  const params = {
+    folder: UPLOAD_FOLDER,
+    timestamp: Math.floor(Date.now() / 1000),
+    allowed_formats: ALLOWED_FORMATS,
+    transformation: UPLOAD_TRANSFORMATION,
+  }
+  const body = new FormData()
+  body.set('file', file)
+  body.set('api_key', apiKey)
+  for (const [name, value] of Object.entries(params)) body.set(name, String(value))
+  body.set('signature', signUploadParams(params, apiSecret))
+
+  return fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body,
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+}
+
+// A successful upload's public id. Anything but one in the upload folder is a
+// broken contract with Cloudinary, so it throws.
+async function publicIdOf(response: Response): Promise<string> {
+  const { public_id: publicId } = (await response.json()) as { public_id: unknown }
+  if (typeof publicId !== 'string' || !IMAGE_PUBLIC_ID_PATTERN.test(publicId)) {
+    throw new Error('Cloudinary upload response has no valid public_id')
+  }
+  return publicId
+}
+
 // Checks size and type (declared MIME type and magic bytes), then uploads to
 // Cloudinary with a signed request from the server. Cloudinary's response
 // body is never returned or logged, since it can echo the signature. The
@@ -312,30 +362,10 @@ export async function uploadRecipeImage(formData: FormData): Promise<UploadResul
     return { ok: false, error: 'Images must be JPEG, PNG, WebP, AVIF or HEIC.' }
   }
 
-  const cloudName = requireEnv('CLOUDINARY_CLOUD_NAME')
-  const apiKey = requireEnv('CLOUDINARY_API_KEY')
-  const apiSecret = requireEnv('CLOUDINARY_API_SECRET')
-
-  const params = {
-    folder: UPLOAD_FOLDER,
-    timestamp: Math.floor(Date.now() / 1000),
-    allowed_formats: ALLOWED_FORMATS,
-    transformation: UPLOAD_TRANSFORMATION,
-  }
-  const body = new FormData()
-  body.set('file', file)
-  body.set('api_key', apiKey)
-  for (const [name, value] of Object.entries(params)) body.set(name, String(value))
-  body.set('signature', signUploadParams(params, apiSecret))
-
   const uploadFailed: UploadResult = { ok: false, error: 'The image could not be uploaded. Please try again.' }
   let response: Response
   try {
-    response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-      method: 'POST',
-      body,
-      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-    })
+    response = await postSignedUpload(file, UPLOAD_TIMEOUT_MS)
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'TimeoutError')) throw error
     console.error(`Cloudinary upload timed out after ${UPLOAD_TIMEOUT_MS} ms`)
@@ -345,7 +375,62 @@ export async function uploadRecipeImage(formData: FormData): Promise<UploadResul
     console.error(`Cloudinary upload failed with status ${response.status}`)
     return uploadFailed
   }
-  const { public_id: publicId } = (await response.json()) as { public_id: unknown }
-  if (typeof publicId !== 'string') throw new Error('Cloudinary upload response has no public_id')
-  return { ok: true, publicId }
+  return { ok: true, publicId: await publicIdOf(response) }
+}
+
+// Fetches a recipe page and returns its values to prefill the form; nothing is
+// saved, the admin reviews and saves it through createRecipe. The page's photo
+// is imported into Cloudinary by URL. A failed photo import still returns the
+// values, flagged, so the admin can upload one by hand. Logs carry only a
+// reason code, status or error name: never the URL, a page or response body,
+// or an error message, since those can echo user input or the signature.
+export async function importRecipe(url: string): Promise<ImportResult> {
+  await requireAdminSession()
+  // Typed as a string, but a client can send any value.
+  const trimmed = typeof url === 'string' ? url.trim() : ''
+  if (!sourceUrlSchema.safeParse(trimmed).success) {
+    return { ok: false, error: 'Enter a link that starts with http:// or https://.' }
+  }
+
+  if (importsInFlight >= MAX_IMPORTS_IN_FLIGHT) {
+    return { ok: false, error: 'An import is already running. Try again in a moment.' }
+  }
+  importsInFlight++
+  try {
+    return await importFromUrl(trimmed)
+  } finally {
+    importsInFlight--
+  }
+}
+
+async function importFromUrl(trimmed: string): Promise<ImportResult> {
+  let page: FetchedPage
+  try {
+    page = await fetchPage(trimmed)
+  } catch (error) {
+    if (!(error instanceof FetchPageError)) throw error
+    console.error(`Recipe import fetch failed: ${error.reason}`)
+    return { ok: false, error: "That link couldn't be loaded." }
+  }
+  const parsed = parseRecipePage(page.html, page.finalUrl)
+  if (!parsed) return { ok: false, error: 'No recipe found on that page.' }
+  const { values, imageUrl } = parsed
+  if (!imageUrl) return { ok: true, values, photoFailed: false }
+
+  let response: Response
+  try {
+    response = await postSignedUpload(imageUrl, IMPORT_PHOTO_TIMEOUT_MS)
+  } catch (error) {
+    // Only a timeout or a network failure (undici's TypeError) is expected;
+    // anything else, such as a missing env var, fails fast.
+    const timedOut = error instanceof DOMException && error.name === 'TimeoutError'
+    if (!timedOut && !(error instanceof TypeError)) throw error
+    console.error(`Recipe import photo upload failed: ${error.name}`)
+    return { ok: true, values, photoFailed: true }
+  }
+  if (!response.ok) {
+    console.error(`Recipe import photo upload failed with status ${response.status}`)
+    return { ok: true, values, photoFailed: true }
+  }
+  return { ok: true, values: { ...values, imagePublicId: await publicIdOf(response) }, photoFailed: false }
 }

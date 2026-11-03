@@ -12,6 +12,9 @@
 //
 // A file whose name contains "slow" is held until the test calls
 // releaseSlowUpload(), so a test can look at the form mid-upload.
+//
+// An upload by URL (the recipe importer's photo) has `file` as a string; it
+// is answered 500 when the URL contains "fail", and is logged only on success.
 import { appendFileSync, existsSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
@@ -25,7 +28,8 @@ import {
 export type FakeUpload = {
   // Every string field of the multipart body.
   fields: Record<string, string>
-  file: { name: string; type: string; size: number }
+  // An uploaded File, or the URL Cloudinary was asked to fetch.
+  file: { name: string; type: string; size: number } | { url: string }
   publicId: string
 }
 
@@ -58,8 +62,16 @@ globalThis.fetch = async function fakeCloudinaryFetch(input, init) {
 
   const form = await request.formData()
   const file = form.get('file')
-  if (!(file instanceof File)) throw new Error('fake Cloudinary: the upload has no file')
   const fields = stringFields(form)
+  if (typeof file === 'string') {
+    if (file.includes('fail')) return new Response('fake Cloudinary: fetch failed', { status: 500 })
+    // Deterministic: "https://example.com/photos/lasagna.jpg" uploads as "recipes/lasagna".
+    const publicId = `recipes/${new URL(file).pathname.split('/').at(-1)!.replace(/\.[^.]*$/, '')}`
+    const upload: FakeUpload = { fields, file: { url: file }, publicId }
+    appendFileSync(FAKE_CLOUDINARY_LOG, `${JSON.stringify(upload)}\n`)
+    return Response.json({ public_id: publicId })
+  }
+  if (!(file instanceof File)) throw new Error('fake Cloudinary: the upload has no file')
   // Deterministic: "lasagna.png" uploads as "recipes/lasagna".
   const publicId = `recipes/${file.name.replace(/\.[^.]*$/, '')}`
   const upload: FakeUpload = {
