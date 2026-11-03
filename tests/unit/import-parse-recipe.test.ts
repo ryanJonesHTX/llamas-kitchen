@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { RecipeFormValues } from '../../components/RecipeForm'
-import { MAX_RECIPE_TAGS } from '../../lib/constants'
+import { MAX_RECIPE_INGREDIENTS, MAX_RECIPE_STEPS, MAX_RECIPE_TAGS } from '../../lib/constants'
 import { parseRecipePage } from '../../lib/import/parseRecipe'
 import { parseIngredient } from '../../lib/ingredients'
 import { recipeInputSchema } from '../../lib/recipes/input'
@@ -329,6 +329,27 @@ describe('ingredients', () => {
       expect(values(fields).ingredients).toEqual([{ line: '' }])
     }
   )
+
+  // Kept one past the limit so the form shows its "too many" error, while a
+  // hostile page's huge list never reaches the browser.
+  function lines(count: number): string[] {
+    return Array.from({ length: count }, (_, i) => `${i + 1} onion`)
+  }
+
+  it.each([
+    ['exactly the limit', MAX_RECIPE_INGREDIENTS, MAX_RECIPE_INGREDIENTS],
+    ['one over the limit', MAX_RECIPE_INGREDIENTS + 1, MAX_RECIPE_INGREDIENTS + 1],
+    ['100 000', 100_000, MAX_RECIPE_INGREDIENTS + 1],
+  ])('keeps the first rows in order, at most one over the limit, for %s ingredients', (_, count, kept) => {
+    expect(values({ recipeIngredient: lines(count) }).ingredients).toEqual(lines(kept).map((line) => ({ line })))
+  })
+
+  it('does not count blank ingredient lines toward the limit', () => {
+    const withBlanks = lines(MAX_RECIPE_INGREDIENTS + 1).flatMap((line) => ['', line, '  '])
+    expect(values({ recipeIngredient: withBlanks }).ingredients).toEqual(
+      lines(MAX_RECIPE_INGREDIENTS + 1).map((line) => ({ line }))
+    )
+  })
 })
 
 describe('steps', () => {
@@ -398,6 +419,41 @@ describe('steps', () => {
       expect(values(fields).steps).toEqual([{ text: '' }])
     }
   )
+
+  // Kept one past the limit so the form shows its "too many" error, while a
+  // hostile page's huge list never reaches the browser.
+  function texts(count: number): string[] {
+    return Array.from({ length: count }, (_, i) => `Step ${i + 1}.`)
+  }
+
+  const shapes: [string, (steps: string[]) => unknown][] = [
+    ['a newline-separated string', (steps) => steps.join('\n')],
+    ['HowToStep arrays', (steps) => steps.map((text) => ({ '@type': 'HowToStep', text }))],
+    [
+      'HowToSection nesting',
+      (steps) => [
+        { '@type': 'HowToSection', name: 'First', itemListElement: steps.slice(0, 10).map((text) => ({ '@type': 'HowToStep', text })) },
+        { '@type': 'HowToSection', name: 'Rest', itemListElement: steps.slice(10).map((text) => ({ '@type': 'HowToStep', text })) },
+      ],
+    ],
+  ]
+  const counts: [string, number, number][] = [
+    ['exactly the limit', MAX_RECIPE_STEPS, MAX_RECIPE_STEPS],
+    ['one over the limit', MAX_RECIPE_STEPS + 1, MAX_RECIPE_STEPS + 1],
+    ['100 000', 100_000, MAX_RECIPE_STEPS + 1],
+  ]
+
+  it.each(shapes.flatMap(([shape, build]) => counts.map(([label, count, kept]) => [shape, label, build, count, kept] as const)))(
+    'keeps the first steps in order, at most one over the limit, from %s with %s steps',
+    (_, __, build, count, kept) => {
+      expect(values({ recipeInstructions: build(texts(count)) }).steps).toEqual(texts(kept).map((text) => ({ text })))
+    }
+  )
+
+  it('does not count blank steps toward the limit', () => {
+    const withBlanks = texts(MAX_RECIPE_STEPS + 1).flatMap((text) => ['', text, { '@type': 'HowToStep', text: ' ' }])
+    expect(values({ recipeInstructions: withBlanks }).steps).toEqual(texts(MAX_RECIPE_STEPS + 1).map((text) => ({ text })))
+  })
 })
 
 describe('servings', () => {

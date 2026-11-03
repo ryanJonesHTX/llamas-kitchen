@@ -2,7 +2,7 @@
 // values and the photo URL to import. Pure: no network, no DB. The person
 // reviews the values in the form, whose validation reports over-long fields.
 import type { RecipeFormValues } from '../../components/RecipeForm'
-import { MAX_RECIPE_TAGS } from '../constants'
+import { MAX_RECIPE_INGREDIENTS, MAX_RECIPE_STEPS, MAX_RECIPE_TAGS } from '../constants'
 import { normalizeTag } from '../recipes/input'
 
 type JsonObject = Record<string, unknown>
@@ -91,8 +91,13 @@ function textOf(value: unknown): string {
   return typeof value === 'string' ? cleanText(value) : ''
 }
 
+// Ingredient and step rows are kept to one past the limit: enough for the form to
+// report "too many", without sending a hostile page's huge list to the browser.
 function ingredientRows(recipe: JsonObject): RecipeFormValues['ingredients'] {
-  const lines = asList(recipe.recipeIngredient ?? recipe.ingredients).map(textOf).filter(Boolean)
+  const lines = asList(recipe.recipeIngredient ?? recipe.ingredients)
+    .map(textOf)
+    .filter(Boolean)
+    .slice(0, MAX_RECIPE_INGREDIENTS + 1)
   return lines.length ? lines.map((line) => ({ line })) : [{ line: '' }]
 }
 
@@ -108,7 +113,7 @@ function stepTexts(value: unknown, depth = 0): string[] {
 }
 
 function stepRows(recipe: JsonObject): RecipeFormValues['steps'] {
-  const texts = stepTexts(recipe.recipeInstructions).filter(Boolean)
+  const texts = stepTexts(recipe.recipeInstructions).filter(Boolean).slice(0, MAX_RECIPE_STEPS + 1)
   return texts.length ? texts.map((text) => ({ text })) : [{ text: '' }]
 }
 
